@@ -46,6 +46,10 @@ const parseDidDocument = j.compile(DidDocumentSchema);
 
 const DID_CACHE = new Map<Did, { doc: DidDocument; exp: number }>();
 
+export function dropCachedDid(did: Did) {
+  DID_CACHE.delete(did);
+}
+
 export class DidDocumentInvalid extends Error {
   constructor(
     public did: Did,

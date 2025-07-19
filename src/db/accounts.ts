@@ -71,20 +71,17 @@ const createAccount = db
 
 const getSigningKey = db
   .prepare(`SELECT signing_key, signing_key_type FROM accounts WHERE did = ?`)
-  .$pipe(
-    stmt =>
-      async (did: Did): Promise<RepoSigningKey | undefined> =>
-        await stmt
-          .get<{ signing_key: Uint8Array; signing_key_type: string }>(did)
-          ?.$pipe(it => {
-            if (it.signing_key_type === "secp256k1") {
-              return Secp256k1PrivateKey.importRaw(it.signing_key);
-            }
-            if (it.signing_key_type === "p256") {
-              return P256PrivateKey.importRaw(it.signing_key);
-            }
-            throw new Error("unknown key type");
-          }),
-  );
+  .$pipe(stmt => {
+    return async (did: Did): Promise<RepoSigningKey | undefined> =>
+      await stmt.get<{ signing_key: Uint8Array; signing_key_type: string }>(did)?.$pipe(it => {
+        if (it.signing_key_type === "secp256k1") {
+          return Secp256k1PrivateKey.importRaw(it.signing_key);
+        }
+        if (it.signing_key_type === "p256") {
+          return P256PrivateKey.importRaw(it.signing_key);
+        }
+        throw new Error("unknown key type");
+      });
+  });
 
 export const accountsDb = { db, getAccount, createAccount, getSigningKey };

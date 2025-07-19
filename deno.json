@@ -1,4 +1,6 @@
 {
+  "version": "0.1.0",
+
   "lock": false,
   "tasks": {
     "start": "deno run -A ./src/main.ts",

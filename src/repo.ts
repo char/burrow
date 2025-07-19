@@ -1,9 +1,9 @@
+import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
+import { assert } from "node:console";
 import { Bytes, CBOR, CID, CidLink, TID } from "./_deps.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
 import { Did } from "./did.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
-
-import { P256PrivateKeyExportable, Secp256k1PrivateKeyExportable } from "@atcute/crypto";
 
 interface CommitNode {
   did: Did;
@@ -22,16 +22,37 @@ export type RepoMutation =
   | { type: "update"; collection: string; rkey: string; record: unknown }
   | { type: "delete"; collection: string; rkey: string };
 
+export type RepoSigningKey = P256PrivateKey | Secp256k1PrivateKey;
+
 export class Repository {
   constructor(
     public storage: RepoStorage,
-    public keypair: P256PrivateKeyExportable | Secp256k1PrivateKeyExportable,
+    public keypair: RepoSigningKey,
   ) {}
 
-  read(root: CID.Cid): Map<string, CID.Cid> {
+  #lastCommitCid: string | undefined;
+  #lastCidMap: Map<string, CID.Cid> = new Map();
+
+  readCidMap(): Map<string, CID.Cid> {
+    const commitCid = this.storage.getCommit();
+    if (commitCid === undefined) return new Map();
+    const commitCidStr = CID.toString(commitCid);
+    if (commitCid !== undefined && this.#lastCommitCid === commitCidStr) {
+      return new Map(this.#lastCidMap);
+    }
+
+    const commitNode: CommitNode | undefined = this.storage
+      .getBlock(commitCid)
+      ?.$pipe(CBOR.decode);
+    if (!commitNode) throw new Error("commit node not found");
+
     const map = new Map();
-    collectMSTKeys(this.storage, root, map);
-    return map;
+    collectMSTKeys(this.storage, commitNode.data.toCid(), map);
+
+    this.#lastCommitCid = commitCidStr;
+    this.#lastCidMap = map;
+
+    return new Map(map);
   }
 
   async #storeRecord(record: unknown) {
@@ -39,47 +60,6 @@ export class Repository {
     const cid = await CID.create(0x71, data);
     this.storage.putBlock(cid, data);
     return cid;
-  }
-
-  async #updateMST(
-    oldRoot: CID.Cid,
-    mutations: RepoMutation[],
-  ): Promise<{ root: CidLink; leaves: CID.Cid[]; pruned: CID.Cid[] }> {
-    const leaves = [];
-    const pruned = [];
-
-    const map = this.read(oldRoot);
-    for (const m of mutations) {
-      switch (m.type) {
-        case "create": {
-          const cid = await this.#storeRecord(m.record);
-          map.set(`${m.collection}/${m.rkey}`, cid);
-          leaves.push(cid);
-          break;
-        }
-        case "update": {
-          const existingCid = map.get(`${m.collection}/${m.rkey}`);
-          if (existingCid) pruned.push(existingCid);
-
-          const cid = await this.#storeRecord(m.record);
-          map.set(`${m.collection}/${m.rkey}`, cid);
-          leaves.push(cid);
-          break;
-        }
-        case "delete": {
-          const cid = map.get(`${m.collection}/${m.rkey}`);
-          if (cid) {
-            map.delete(`${m.collection}/${m.rkey}`);
-            pruned.push(cid);
-          }
-          break;
-        }
-      }
-    }
-
-    this.storage.clearEphemeralBlocks();
-    const root = await generateMST(this.storage, map);
-    return { leaves, pruned, root };
   }
 
   async #writeCommit(newRoot: CidLink, lastCommit?: CommitNode): Promise<CID.Cid> {
@@ -103,6 +83,12 @@ export class Repository {
     return cid;
   }
 
+  getRecord(collection: string, rkey: string): object | undefined {
+    const map = this.readCidMap();
+    const recordCid = map.get(`${collection}/${rkey}`);
+    return recordCid?.$pipe(this.storage.getBlock)?.$pipe(CBOR.decode);
+  }
+
   async mutate(mutations: RepoMutation[]) {
     const lastCommitCid = this.storage.getCommit();
     if (!lastCommitCid) throw new Error("tried to mutate repo that had no initial commit");
@@ -110,13 +96,57 @@ export class Repository {
     const lastCommit = this.storage
       .getBlock(lastCommitCid)
       ?.$pipe(CBOR.decode) as SignedCommitNode;
-    const { root, leaves, pruned } = await this.#updateMST(lastCommit.data.toCid(), mutations);
-    await this.#writeCommit(root, lastCommit);
 
-    // gc
+    const spawned = [];
+    const pruned = [];
+
+    const map = this.readCidMap();
+    for (const m of mutations) {
+      switch (m.type) {
+        case "create": {
+          const cid = await this.#storeRecord(m.record);
+          map.set(`${m.collection}/${m.rkey}`, cid);
+          spawned.push(cid);
+          break;
+        }
+        case "update": {
+          const existingCid = map.get(`${m.collection}/${m.rkey}`);
+          if (existingCid) pruned.push(existingCid);
+
+          const cid = await this.#storeRecord(m.record);
+          map.set(`${m.collection}/${m.rkey}`, cid);
+          spawned.push(cid);
+          break;
+        }
+        case "delete": {
+          const cid = map.get(`${m.collection}/${m.rkey}`);
+          if (cid) {
+            map.delete(`${m.collection}/${m.rkey}`);
+            pruned.push(cid);
+          }
+          break;
+        }
+      }
+    }
+    this.storage.clearEphemeralBlocks();
+    const root = await generateMST(this.storage, map, spawned);
+    const commitCid = await this.#writeCommit(root, lastCommit);
+    spawned.push(commitCid);
+
+    this.#lastCommitCid = CID.toString(commitCid);
+    this.#lastCidMap = map;
+
+    // gc pruned blocks
     this.storage.deleteBlock(lastCommitCid);
     for (const cid of pruned) this.storage.deleteBlock(cid);
 
-    // TODO: emit commit on event stream
+    // TODO: emit commit on event stream using spawnlist as blocks
+    console.log({ spawned: spawned.map(CID.toString) });
+  }
+
+  async initialCommit() {
+    assert(this.storage.getCommit() === undefined);
+    const root = await generateMST(this.storage, new Map());
+    const _commit = await this.#writeCommit(root);
   }
 }

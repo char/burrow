@@ -8,9 +8,10 @@ export interface RepoStorage {
   db: Database;
 
   getBlock: (cid: CID.Cid) => Uint8Array | undefined;
-  putBlock: (cid: CID.Cid, data: Uint8Array, ephemeral?: number) => void;
+  putBlock: (cid: CID.Cid, data: Uint8Array, ephemeral?: number) => boolean;
   deleteBlock: (cid: CID.Cid) => void;
   clearEphemeralBlocks: () => void;
+
   getCommit: () => CID.Cid | undefined;
   setCommit: (cid: CID.Cid) => void;
 }
@@ -24,7 +25,6 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   db.exec(`pragma synchronous = NORMAL;`);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blobs (
-      id INTEGER PRIMARY KEY NOT NULL,
       cid TEXT NOT NULL UNIQUE,
       mime TEXT NOT NULL,
       refs INTEGER NOT NULL DEFAULT 0,
@@ -40,7 +40,6 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blocks (
-      id INTEGER PRIMARY KEY NOT NULL,
       cid TEXT NOT NULL UNIQUE,
       block BLOB NOT NULL,
       ephemeral INTEGER DEFAULT 0
@@ -48,7 +47,6 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS block_aliases (
-      id INTEGER PRIMARY KEY NOT NULL,
       name TEXT NOT NULL UNIQUE,
       cid TEXT NOT NULL UNIQUE
     ) STRICT;
@@ -56,7 +54,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
   const getBlockStatement = db.prepare("SELECT block FROM blocks WHERE cid = ?");
   const putBlockStatement = db.prepare(
-    "INSERT OR REPLACE INTO blocks (cid, block, ephemeral) VALUES (?, ?, ?)",
+    "INSERT OR IGNORE INTO blocks (cid, block, ephemeral) VALUES (?, ?, ?)",
   );
   const deleteBlockStatement = db.prepare("DELETE FROM blocks WHERE cid = ?");
 
@@ -71,7 +69,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
     getBlock: cid => getBlockStatement.get<{ block: Uint8Array }>(CID.toString(cid))?.block,
     putBlock: (cid, data, ephemeral = 0) =>
-      void putBlockStatement.run(CID.toString(cid), data, ephemeral),
+      putBlockStatement.run(CID.toString(cid), data, ephemeral) !== 0,
     deleteBlock: cid => void deleteBlockStatement.run(CID.toString(cid)),
     clearEphemeralBlocks: () => void db.run(`DELETE FROM blocks WHERE ephemeral = 1`),
 

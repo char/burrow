@@ -1,6 +1,7 @@
 import { Database } from "@db/sqlite";
 import { j, path } from "../_deps.ts";
 import { appConfig } from "../config.ts";
+import { Did } from "../did.ts";
 
 const db = new Database(path.join(appConfig.dataDir, "accounts.db"));
 db.exec(`pragma journal_mode = WAL;`);
@@ -11,9 +12,11 @@ db.exec(`
     did TEXT NOT NULL UNIQUE,
     handle TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
+    password_hash BLOB NOT NULL,
     -- no email_confirmed_at because all emails are confirmed
-    deactivated_at INTEGER
+    deactivated_at INTEGER,
+    signing_key BLOB NOT NULL,
+    signing_key_type TEXT NOT NULL
   ) STRICT;
 `);
 
@@ -28,7 +31,7 @@ const AccountModel = j.obj({
 const parseAccount = j.compile(AccountModel);
 
 const getAccount = db.prepare("SELECT * FROM accounts WHERE did = ?").$pipe(stmt => {
-  return (did: string) => {
+  return (did: Did) => {
     const row = stmt.get(did);
     if (row === null) return undefined;
     const { value } = parseAccount(row);
@@ -36,4 +39,52 @@ const getAccount = db.prepare("SELECT * FROM accounts WHERE did = ?").$pipe(stmt
   };
 });
 
-export const accountsDb = { db, getAccount };
+import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
+import { scryptAsync } from "@noble/hashes/scrypt";
+import { RepoSigningKey } from "../repo.ts";
+
+const createAccount = db
+  .prepare(
+    `INSERT INTO accounts
+    (did, handle, email, password_hash, signing_key, signing_key_type)
+    VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+  .$pipe(stmt => {
+    return async (
+      did: Did,
+      handle: string,
+      email: string,
+      password: string,
+      signingKey: RepoSigningKey,
+    ) => {
+      stmt.run(
+        did,
+        handle,
+        email,
+        await scryptAsync(password, did, { N: 2 ** 16, r: 8, p: 1 }),
+        // @ts-expect-error internal access
+        signingKey._privateKey,
+        signingKey.type,
+      );
+    };
+  });
+
+const getSigningKey = db
+  .prepare(`SELECT signing_key, signing_key_type FROM accounts WHERE did = ?`)
+  .$pipe(
+    stmt =>
+      async (did: Did): Promise<RepoSigningKey | undefined> =>
+        await stmt
+          .get<{ signing_key: Uint8Array; signing_key_type: string }>(did)
+          ?.$pipe(it => {
+            if (it.signing_key_type === "secp256k1") {
+              return Secp256k1PrivateKey.importRaw(it.signing_key);
+            }
+            if (it.signing_key_type === "p256") {
+              return P256PrivateKey.importRaw(it.signing_key);
+            }
+            throw new Error("unknown key type");
+          }),
+  );
+
+export const accountsDb = { db, getAccount, createAccount, getSigningKey };

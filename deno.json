@@ -9,6 +9,8 @@
   "imports": {
     "@atcute/cbor": "npm:@atcute/cbor@^2.2.5",
     "@atcute/cid": "npm:@atcute/cid@^2.2.3",
+    "@atcute/crypto": "npm:@atcute/crypto@^2.2.3",
+    "@atcute/tid": "npm:@atcute/tid@^1.0.2",
     "@atcute/uint8array": "npm:@atcute/uint8array@^1.0.3",
     "@char/justin": "jsr:@char/justin@^0.3.5",
     "@db/sqlite": "jsr:@db/sqlite@^0.12.0",

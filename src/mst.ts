@@ -1,7 +1,7 @@
 import { encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
 import { assert, Bytes, CBOR, CID, CidLink } from "./_deps.ts";
-import { RepoStorage } from "./db/repo.ts";
+import { RepoStorage } from "./db/repo_storage.ts";
 
 interface Node {
   height: number;
@@ -165,7 +165,26 @@ async function finalizeTree(repo: RepoStorage, node: Node): Promise<CidLink> {
 
   const data = CBOR.encode(mstNode);
   const cid = await CID.create(0x71, data);
-  repo.putBlock(cid, data, true);
+  repo.putBlock(cid, data, 1);
 
   return new CidLink(cid.bytes);
+}
+
+export function collectMSTKeys(
+  repo: RepoStorage,
+  cid: CID.Cid,
+  map: Map<string, CID.Cid>,
+): void {
+  const node: MSTNode | undefined = repo.getBlock(cid)?.$pipe(CBOR.decode);
+  if (!node) return;
+  if (node.l) {
+    collectMSTKeys(repo, node.l.toCid(), map);
+  }
+  let key = "";
+  for (const entry of node.e) {
+    const prefix = key.substring(0, entry.p);
+    key = prefix + entry.k;
+    map.set(key, entry.v.toCid());
+    if (entry.t) collectMSTKeys(repo, entry.t.toCid(), map);
+  }
 }

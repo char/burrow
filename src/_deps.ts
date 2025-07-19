@@ -35,4 +35,5 @@ Object.defineProperty(CidLink, "fromCid", {
   },
 });
 
+export * as TID from "@atcute/tid";
 export { Bytes, CBOR, CID, CidLink };

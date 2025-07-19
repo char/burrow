@@ -4,6 +4,7 @@ import { appConfig } from "../config.ts";
 
 const db = new Database(path.join(appConfig.dataDir, "accounts.db"));
 db.exec(`pragma journal_mode = WAL;`);
+db.exec(`pragma synchronous = NORMAL;`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER NOT NULL PRIMARY KEY,

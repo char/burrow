@@ -18,10 +18,10 @@ router.get("/", ctx => {
   ctx.response.type = "text/plain; charset=utf-8";
   ctx.response.body = `burrow pds version ${VERSION}
 
-  /)/)
+ /)/)
 ( . .)
 ( づ♡
- 
+
 this is an atproto PDS ^-^ see atproto.com`;
 });
 

@@ -6,9 +6,9 @@ const VERSION = denoJson.version;
 import { Application, Router } from "@oak/oak";
 
 import { appConfig } from "./config.ts";
+import { setupRepoRoutes } from "./routes/atproto_repo.ts";
 import { setupDidWebRoutes } from "./routes/did_web.ts";
 import { setupTestRoutes } from "./routes/test.ts";
-import { atprotoRepoSetup } from "./rpc/atproto_repo.ts";
 import { XRPCRouter } from "./xrpc-server.ts";
 
 const app = new Application();
@@ -30,7 +30,7 @@ this is an atproto PDS ^-^ see atproto.com`;
 
 setupTestRoutes(app, router);
 setupDidWebRoutes(app, router);
-atprotoRepoSetup(app, xrpc);
+setupRepoRoutes(app, xrpc);
 
 app.use(xrpc.middleware());
 app.use(router.routes());

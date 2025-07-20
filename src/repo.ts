@@ -1,6 +1,5 @@
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
-import { assert } from "node:console";
-import { Bytes, CBOR, CidLink, TID } from "./_deps.ts";
+import { assert, Bytes, CBOR, CidLink, TID } from "./_deps.ts";
 import { Cid, createCid } from "./cid.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
 import { Did } from "./did.ts";
@@ -147,7 +146,7 @@ export class Repository {
 
   async initialCommit() {
     assert(this.storage.getCommit() === undefined);
-    const root = await generateMST(this.storage, new Map());
+    const root = generateMST(this.storage, new Map());
     const _commit = await this.#writeCommit(root);
   }
 }

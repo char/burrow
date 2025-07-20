@@ -5,8 +5,8 @@ export const config = ngx("", [
   ngx("map $http_upgrade $connection_upgrade", ["default upgrade", "'' close"]),
   ngx("server", [
     ...ngx.listen(),
-    ...ngx.letsEncrypt(domain),
     ngx.serverName(domain),
+    ...ngx.letsEncrypt(domain),
     ngx("location /", [
       "client_max_body_size 1G",
       "proxy_pass http://127.0.0.1:3000",
@@ -20,8 +20,8 @@ export const config = ngx("", [
   ngx("server", [
     "# wildcard server for did:webs",
     ...ngx.listen(),
-    ...ngx.letsEncrypt(domain),
     ngx.serverName("*." + domain),
+    ...ngx.letsEncrypt(domain),
     ngx("location /", ["proxy_pass http://127.0.0.1:3000", "proxy_set_header Host $host"]),
   ]),
 ]);

@@ -5,7 +5,7 @@ import { DidSchema } from "../did.ts";
 import { openRepository } from "../repo.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
 
-export function atprotoRepoSetup(_app: Application, xrpc: XRPCRouter) {
+export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
     {
       method: "com.atproto.repo.getRecord",

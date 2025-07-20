@@ -11,6 +11,7 @@ import { appConfig } from "./config.ts";
 import { accountsDb } from "./db/accounts.ts";
 import { openRepoDatabase } from "./db/repo_storage.ts";
 import { Repository } from "./repo.ts";
+import { atprotoRepoSetup } from "./rpc/atproto_repo.ts";
 import { XRPCRouter } from "./xrpc-server.ts";
 
 const app = new Application();
@@ -54,6 +55,8 @@ router.post("/test/create-account", async ctx => {
 
   ctx.response.body = ":)";
 });
+
+atprotoRepoSetup(app, xrpc);
 
 app.use(xrpc.middleware());
 app.use(router.routes());

@@ -1,7 +1,8 @@
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
 import { assert, Bytes, CBOR, CidLink, TID } from "./_deps.ts";
 import { Cid, createCid } from "./cid.ts";
-import { RepoStorage } from "./db/repo_storage.ts";
+import { accountsDb } from "./db/accounts.ts";
+import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { Did } from "./did.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
 
@@ -33,7 +34,7 @@ export class Repository {
   #lastCommitCid: Cid | undefined;
   #lastCidMap: Map<string, Cid> = new Map();
 
-  readCidMap(): Map<string, Cid> {
+  #readCidMap(): Map<string, Cid> {
     const commitCid = this.storage.getCommit();
     if (commitCid === undefined) return new Map();
     if (this.#lastCommitCid === commitCid) {
@@ -82,10 +83,10 @@ export class Repository {
     return cid;
   }
 
-  getRecord(collection: string, rkey: string): object | undefined {
-    const map = this.readCidMap();
-    const recordCid = map.get(`${collection}/${rkey}`);
-    return recordCid?.$pipe(this.storage.getBlock)?.$pipe(CBOR.decode);
+  async initialCommit() {
+    assert(this.storage.getCommit() === undefined);
+    const root = generateMST(this.storage, new Map());
+    const _commit = await this.#writeCommit(root);
   }
 
   async mutate(mutations: RepoMutation[]) {
@@ -99,7 +100,7 @@ export class Repository {
     const spawned: Cid[] = [];
     const pruned: Cid[] = [];
 
-    const map = this.readCidMap();
+    const map = this.#readCidMap();
     for (const m of mutations) {
       switch (m.type) {
         case "create": {
@@ -144,9 +145,28 @@ export class Repository {
     console.log({ spawned });
   }
 
-  async initialCommit() {
-    assert(this.storage.getCommit() === undefined);
-    const root = generateMST(this.storage, new Map());
-    const _commit = await this.#writeCommit(root);
+  getRecordCid(collection: string, rkey: string): Cid | undefined {
+    const map = this.#readCidMap();
+    return map.get(`${collection}/${rkey}`);
   }
+
+  getRecord(collection: string, rkey: string): object | undefined {
+    const map = this.#readCidMap();
+    const recordCid = map.get(`${collection}/${rkey}`);
+    return recordCid?.$pipe(this.storage.getBlock)?.$pipe(CBOR.decode);
+  }
+}
+
+const repoPool = new Map<Did, Repository>();
+export async function openRepository(did: Did): Promise<Repository> {
+  const open = repoPool.get(did);
+  if (open) return open;
+
+  const db = await openRepoDatabase(did);
+  const signingKey = await accountsDb.getSigningKey(did);
+  if (!signingKey) throw new Error("no signing key for did: " + did);
+
+  const repo = new Repository(db, signingKey);
+  repoPool.set(did, repo);
+  return repo;
 }

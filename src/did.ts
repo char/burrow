@@ -4,7 +4,7 @@ import { runWithTimeout } from "./util/async.ts";
 export function isDid(did: unknown): did is Did {
   return typeof did === "string" && did.startsWith("did:");
 }
-export const DidSchema = j.custom(isDid);
+export const DidSchema = j.custom(isDid, "must be a did");
 export type Did = `did:${string}`;
 
 const VerificationMethodSchema = j.obj({

@@ -1,9 +1,14 @@
 import { fromBase32, toBase32 } from "@atcute/multibase";
 import { toSha256 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
-import { assert } from "./_deps.ts";
+import { assert, j } from "./_deps.ts";
 
 export type Cid = `bafyrei${string}` | `bafkrei${string}`;
+export const CidSchema = j.custom(
+  (v): v is Cid =>
+    typeof v === "string" && (v.startsWith("bafyrei") || v.startsWith("bafkrei")),
+  "must be a cid",
+);
 
 export function encodeCidFromDigest(codec: 0x55 | 0x71, digest: Uint8Array): Uint8Array {
   const version = 1;

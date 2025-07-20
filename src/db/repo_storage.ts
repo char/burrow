@@ -18,8 +18,6 @@ export interface RepoStorage {
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
-  // TODO: repo pool so we don't have to keep opening repo dbs in-flight
-
   await fs.ensureDir(path.join(appConfig.dataDir, "repos"));
   const db = new Database(path.join(appConfig.dataDir, "repos", did + ".db"));
   db.exec(`pragma journal_mode = WAL;`);

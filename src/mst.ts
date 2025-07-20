@@ -1,4 +1,4 @@
-import { encodeUtf8 } from "@atcute/uint8array";
+import { decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
 import { assert, Bytes, CBOR, CidLink } from "./_deps.ts";
 import { Cid, createCid } from "./cid.ts";
@@ -184,7 +184,7 @@ export function collectMSTKeys(repo: RepoStorage, cid: Cid, map: Map<string, Cid
   let key = "";
   for (const entry of node.e) {
     const prefix = key.substring(0, entry.p);
-    key = prefix + entry.k;
+    key = prefix + decodeUtf8From(CBOR.fromBytes(entry.k));
     map.set(key, entry.v.toCid());
     if (entry.t) collectMSTKeys(repo, entry.t.toCid(), map);
   }

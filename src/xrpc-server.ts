@@ -11,6 +11,7 @@ const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });
 
 export const ERROR_TYPES = {
   InvalidRequest: 400,
+  RecordNotFound: 404,
   MethodNotImplemented: 501,
   InternalServerError: 500,
 } as const;
@@ -223,7 +224,7 @@ export class XRPCRouter {
           if (ctx.request.method === "HEAD") {
             ctx.response.status = 204;
           } else if (ctx.request.method === "GET") {
-            output = route.handler(ctx, { params, input: undefined });
+            output = await route.handler(ctx, { params, input: undefined });
           } else {
             throw new XRPCError(
               "MethodNotImplemented",
@@ -236,7 +237,7 @@ export class XRPCRouter {
             const jsonBody = await ctx.request.body.json();
             input = route.parseInput(jsonBody);
           }
-          output = route.handler(ctx, { params, input });
+          output = await route.handler(ctx, { params, input });
         }
 
         if (output !== undefined) {

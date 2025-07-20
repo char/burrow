@@ -4,7 +4,7 @@ import { Context, Middleware } from "@oak/oak";
 import { URLSearchParams } from "node:url";
 import { j } from "./_deps.ts";
 import { appConfig } from "./config.ts";
-import { isDid, resolveDid } from "./did.ts";
+import { isDid, resolveDid } from "./util/did.ts";
 import { logging } from "./util/log.ts";
 
 const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });

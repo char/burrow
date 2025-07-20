@@ -1,7 +1,7 @@
 import { Application, Router } from "@oak/oak";
 import { appConfig } from "../config.ts";
 import { accountsDb } from "../db/accounts.ts";
-import { Did, DidDocument } from "../did.ts";
+import { Did, DidDocument } from "../util/did.ts";
 
 export function setupDidWebRoutes(_app: Application, router: Router) {
   router.get("/.well-known/did.json", async ctx => {

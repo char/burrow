@@ -1,7 +1,7 @@
 import { Database } from "@db/sqlite";
 import { j, path } from "../_deps.ts";
 import { appConfig } from "../config.ts";
-import { Did } from "../did.ts";
+import { Did } from "../util/did.ts";
 
 const db = new Database(path.join(appConfig.dataDir, "accounts.db"));
 db.exec(`pragma journal_mode = WAL;`);

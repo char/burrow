@@ -1,10 +1,10 @@
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
 import { assert, Bytes, CBOR, CidLink, TID } from "./_deps.ts";
-import { Cid, createCid } from "./cid.ts";
 import { accountsDb } from "./db/accounts.ts";
 import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
-import { Did } from "./did.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
+import { Cid, createCid } from "./util/cid.ts";
+import { Did } from "./util/did.ts";
 
 interface CommitNode {
   did: Did;

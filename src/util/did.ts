@@ -1,5 +1,5 @@
-import { assert, j } from "./_deps.ts";
-import { runWithTimeout } from "./util/async.ts";
+import { assert, j } from "../_deps.ts";
+import { runWithTimeout } from "./async.ts";
 
 export function isDid(did: unknown): did is Did {
   return typeof did === "string" && did.startsWith("did:");

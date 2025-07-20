@@ -1,8 +1,8 @@
 import { Database } from "@db/sqlite";
 import { fs, path } from "../_deps.ts";
-import { Cid } from "../cid.ts";
 import { appConfig } from "../config.ts";
-import { Did } from "../did.ts";
+import { Cid } from "../util/cid.ts";
+import { Did } from "../util/did.ts";
 
 export interface RepoStorage {
   did: Did;

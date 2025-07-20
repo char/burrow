@@ -11,7 +11,7 @@ export * as j from "@char/justin";
 import * as CBOR from "@atcute/cbor";
 
 import { BytesWrapper as Bytes, CidLinkWrapper as CidLink } from "@atcute/cbor";
-import { Cid, cidToBytes } from "./cid.ts";
+import { Cid, cidToBytes } from "./util/cid.ts";
 
 declare module "@atcute/cbor" {
   interface CidLinkWrapper {

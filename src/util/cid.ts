@@ -1,7 +1,7 @@
 import { fromBase32, toBase32 } from "@atcute/multibase";
 import { toSha256 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
-import { assert, j } from "./_deps.ts";
+import { assert, j } from "../_deps.ts";
 
 export type Cid = `bafyrei${string}` | `bafkrei${string}`;
 export const CidSchema = j.custom(

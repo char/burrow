@@ -1,8 +1,8 @@
 import { decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
 import { assert, Bytes, CBOR, CidLink } from "./_deps.ts";
-import { Cid, createCid } from "./cid.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
+import { Cid, createCid } from "./util/cid.ts";
 
 interface Node {
   height: number;

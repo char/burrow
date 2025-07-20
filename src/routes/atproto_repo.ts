@@ -1,8 +1,8 @@
 import { Application } from "@oak/oak";
 import { j } from "../_deps.ts";
-import { CidSchema } from "../cid.ts";
-import { DidSchema } from "../did.ts";
 import { openRepository } from "../repo.ts";
+import { CidSchema } from "../util/cid.ts";
+import { DidSchema } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
 
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {

@@ -25,8 +25,8 @@ const AccountModel = j.obj({
   did: j.string,
   handle: j.string,
   email: j.string,
-  password_hash: j.string,
-  deactivated_at: j.number,
+  password_hash: j.custom(v => v instanceof Uint8Array, "must be Uint8Array"),
+  deactivated_at: j.union(j.literal(null), j.number),
 });
 const parseAccount = j.compile(AccountModel);
 

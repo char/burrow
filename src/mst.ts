@@ -1,6 +1,7 @@
 import { encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
-import { assert, Bytes, CBOR, CID, CidLink } from "./_deps.ts";
+import { assert, Bytes, CBOR, CidLink } from "./_deps.ts";
+import { Cid, createCid } from "./cid.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
 
 interface Node {
@@ -103,11 +104,11 @@ function insertEntry(node: Node, entry: Entry): Node {
   return node;
 }
 
-export async function generateMST(
+export function generateMST(
   repo: RepoStorage,
-  map: Map<string, CID.Cid>,
-  newBlocks?: CID.Cid[],
-) {
+  map: Map<string, Cid>,
+  newBlocks?: Cid[],
+): CidLink {
   let root: Node | undefined;
   for (const [key, val] of map.entries()) {
     const keyBytes = encodeUtf8(key);
@@ -115,7 +116,7 @@ export async function generateMST(
     const entry: Entry = {
       height,
       key: keyBytes,
-      val: new CidLink(val.bytes),
+      val: CidLink.fromCid(val),
       right: undefined,
     };
 
@@ -134,7 +135,7 @@ export async function generateMST(
     left: undefined,
     entries: [],
   };
-  return await finalizeTree(repo, root ?? emptyNode, newBlocks);
+  return finalizeTree(repo, root ?? emptyNode, newBlocks);
 }
 
 function commonPrefixLen(a: Uint8Array, b: Uint8Array) {
@@ -145,17 +146,13 @@ function commonPrefixLen(a: Uint8Array, b: Uint8Array) {
   return i;
 }
 
-async function finalizeTree(
-  repo: RepoStorage,
-  node: Node,
-  newBlocks?: CID.Cid[],
-): Promise<CidLink> {
-  const left = await node.left?.$pipe(n => finalizeTree(repo, n, newBlocks));
+function finalizeTree(repo: RepoStorage, node: Node, newBlocks?: Cid[]): CidLink {
+  const left = node.left?.$pipe(n => finalizeTree(repo, n, newBlocks));
 
   const mstEntries: MSTEntry[] = [];
   let lastKey: Uint8Array = new Uint8Array();
   for (const entry of node.entries) {
-    const right = await entry.right?.$pipe(n => finalizeTree(repo, n, newBlocks));
+    const right = entry.right?.$pipe(n => finalizeTree(repo, n, newBlocks));
     const prefixLen = commonPrefixLen(lastKey, entry.key);
     mstEntries.push({
       k: new Bytes(entry.key.subarray(prefixLen)),
@@ -172,17 +169,13 @@ async function finalizeTree(
   };
 
   const data = CBOR.encode(mstNode);
-  const cid = await CID.create(0x71, data);
+  const cid = createCid(0x71, data);
   if (repo.putBlock(cid, data, 1)) newBlocks?.push(cid);
 
-  return new CidLink(cid.bytes);
+  return CidLink.fromCid(cid);
 }
 
-export function collectMSTKeys(
-  repo: RepoStorage,
-  cid: CID.Cid,
-  map: Map<string, CID.Cid>,
-): void {
+export function collectMSTKeys(repo: RepoStorage, cid: Cid, map: Map<string, Cid>): void {
   const node: MSTNode | undefined = repo.getBlock(cid)?.$pipe(CBOR.decode);
   if (!node) return;
   if (node.l) {

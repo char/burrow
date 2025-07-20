@@ -9,31 +9,31 @@ export * as path from "@std/path";
 export * as j from "@char/justin";
 
 import * as CBOR from "@atcute/cbor";
-import * as CID from "@atcute/cid";
 
 import { BytesWrapper as Bytes, CidLinkWrapper as CidLink } from "@atcute/cbor";
+import { Cid, cidToBytes } from "./cid.ts";
 
 declare module "@atcute/cbor" {
   interface CidLinkWrapper {
-    toCid(): CID.Cid;
+    toCid(): Cid;
   }
 
   namespace CidLinkWrapper {
-    function fromCid(cid: CID.Cid): void;
+    function fromCid(cid: Cid): CidLinkWrapper;
   }
 }
 Object.defineProperty(CidLink.prototype, "toCid", {
   enumerable: false,
-  value: function () {
-    return CBOR.fromCidLink(this);
+  value: function (this: CidLink) {
+    return this.$link as Cid;
   },
 });
 Object.defineProperty(CidLink, "fromCid", {
   enumerable: false,
-  value: function (cid: CID.Cid) {
-    return new CidLink(cid.bytes);
+  value: function (cid: Cid) {
+    return new CidLink(cidToBytes(cid));
   },
 });
 
 export * as TID from "@atcute/tid";
-export { Bytes, CBOR, CID, CidLink };
+export { Bytes, CBOR, CidLink };

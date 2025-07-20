@@ -1,5 +1,6 @@
 import { Database } from "@db/sqlite";
-import { CID, fs, path } from "../_deps.ts";
+import { fs, path } from "../_deps.ts";
+import { Cid } from "../cid.ts";
 import { appConfig } from "../config.ts";
 import { Did } from "../did.ts";
 
@@ -7,13 +8,13 @@ export interface RepoStorage {
   did: Did;
   db: Database;
 
-  getBlock: (cid: CID.Cid) => Uint8Array | undefined;
-  putBlock: (cid: CID.Cid, data: Uint8Array, ephemeral?: number) => boolean;
-  deleteBlock: (cid: CID.Cid) => void;
+  getBlock: (cid: Cid) => Uint8Array | undefined;
+  putBlock: (cid: Cid, data: Uint8Array, ephemeral?: number) => boolean;
+  deleteBlock: (cid: Cid) => void;
   clearEphemeralBlocks: () => void;
 
-  getCommit: () => CID.Cid | undefined;
-  setCommit: (cid: CID.Cid) => void;
+  getCommit: () => Cid | undefined;
+  setCommit: (cid: Cid) => void;
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
@@ -67,13 +68,12 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     did,
     db,
 
-    getBlock: cid => getBlockStatement.get<{ block: Uint8Array }>(CID.toString(cid))?.block,
-    putBlock: (cid, data, ephemeral = 0) =>
-      putBlockStatement.run(CID.toString(cid), data, ephemeral) !== 0,
-    deleteBlock: cid => void deleteBlockStatement.run(CID.toString(cid)),
+    getBlock: cid => getBlockStatement.get<{ block: Uint8Array }>(cid)?.block,
+    putBlock: (cid, data, ephemeral = 0) => putBlockStatement.run(cid, data, ephemeral) !== 0,
+    deleteBlock: cid => void deleteBlockStatement.run(cid),
     clearEphemeralBlocks: () => void db.run(`DELETE FROM blocks WHERE ephemeral = 1`),
 
-    getCommit: () => getCommitStatement.get<{ cid: string }>()?.cid?.$pipe(CID.fromString),
-    setCommit: cid => void setCommitStatement.run(CID.toString(cid)),
+    getCommit: () => getCommitStatement.get<{ cid: string }>()?.cid as Cid | undefined,
+    setCommit: cid => void setCommitStatement.run(cid),
   };
 }

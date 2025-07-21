@@ -1,0 +1,59 @@
+import { Middleware, Request } from "@oak/oak";
+import { j } from "./_deps.ts";
+import { appConfig } from "./config.ts";
+import { Did, DidSchema } from "./util/did.ts";
+import { decodeJwt, verifyJwtHS256Signature } from "./util/jwt.ts";
+
+type AuthInfo = {
+  account: Did;
+};
+
+const dpopAuthJwtHeader = j
+  .obj({
+    typ: j.literal("at+jwt"),
+    alg: j.literal("HS256"),
+  })
+  .$pipe(j.compile);
+const dpopAuthJwtPayload = j
+  .obj({
+    sub: DidSchema,
+    iss: j.string,
+  })
+  .$pipe(j.compile);
+
+export const authenticationInfo = new WeakMap<Request, AuthInfo>();
+
+export const authMiddleware: Middleware = async (ctx, next) => {
+  const authorizationHeader = ctx.response.headers.get("authorization");
+  if (!authorizationHeader) return next();
+
+  if (authorizationHeader.startsWith("DPoP ")) {
+    try {
+      const jwt = authorizationHeader.substring("DPoP ".length);
+      const decoded = decodeJwt(jwt);
+
+      const { value: header } = dpopAuthJwtHeader(decoded.header);
+      if (!header) throw new Error("bad auth jwt header");
+      const { value: payload } = dpopAuthJwtPayload(decoded.payload);
+      if (!payload) throw new Error("bad auth jwt payload");
+
+      // FIXME: read dpop header and verify stuff
+
+      if (!(await verifyJwtHS256Signature(appConfig.jwtSecret, jwt)))
+        throw new Error("bad jwt signature");
+      authenticationInfo.set(ctx.request, { account: payload.sub });
+    } catch (err) {
+      console.warn(err);
+
+      ctx.response.status = 401;
+      ctx.response.type = "application/json";
+      ctx.response.body = {
+        error: "invalid_dpop_proof",
+        message: "failed to verify dpop proof signature",
+      };
+      return;
+    }
+  }
+
+  return next();
+};

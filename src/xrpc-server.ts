@@ -10,6 +10,9 @@ import { logging } from "./util/log.ts";
 const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });
 
 export const ERROR_TYPES = {
+  invalid_dpop_proof: 401,
+  use_dpop_nonce: 400,
+
   InvalidRequest: 400,
   RecordNotFound: 404,
   MethodNotImplemented: 501,

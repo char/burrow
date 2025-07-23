@@ -37,3 +37,7 @@ Object.defineProperty(CidLink, "fromCid", {
 
 export * as TID from "@atcute/tid";
 export { Bytes, CBOR, CidLink };
+
+import vento from "https://deno.land/x/vento@v1.15.0/mod.ts";
+const ventoEnv = vento();
+export { ventoEnv };

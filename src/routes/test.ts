@@ -2,7 +2,7 @@ import { Secp256k1PrivateKeyExportable } from "@atcute/crypto";
 import { Application, Router } from "@oak/oak";
 import { TID } from "../_deps.ts";
 import { appConfig } from "../config.ts";
-import { accountsDb } from "../db/accounts.ts";
+import { mainDb } from "../db/main_db.ts";
 import { openRepoDatabase } from "../db/repo_storage.ts";
 import { Repository } from "../repo.ts";
 
@@ -19,7 +19,7 @@ export function setupTestRoutes(_app: Application, router: Router) {
     const testDomain = "x-burrow-20250718.tmp.bun.how";
 
     const signingKey = await Secp256k1PrivateKeyExportable.createKeypair();
-    accountsDb.createAccount(
+    mainDb.createAccount(
       `did:web:testing.${testDomain}`,
       "testing." + testDomain,
       "testing@" + testDomain,

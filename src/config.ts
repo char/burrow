@@ -37,5 +37,6 @@ export const appConfig = {
   bindHost: load("BIND_HOST", "127.0.0.1"),
   fallbackAppviewUrl: load("BURROW_FALLBACK_APPVIEW_URL", "https://api.pop1.bsky.app"),
   adminPassword: Deno.env.get("BURROW_ADMIN_PASSWORD"),
+  cookieSecret: await loadOrGenerate("BURROW_COOKIE_SECRET", () => nanoid(24)),
   jwtSecret: await loadOrGenerate("BURROW_JWT_SECRET", () => nanoid(24)).then(encodeUtf8),
 };

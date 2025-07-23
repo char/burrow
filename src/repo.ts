@@ -1,6 +1,6 @@
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
 import { assert, Bytes, CBOR, CidLink, TID } from "./_deps.ts";
-import { accountsDb } from "./db/accounts.ts";
+import { mainDb } from "./db/main_db.ts";
 import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
 import { Cid, createCid } from "./util/cid.ts";
@@ -163,7 +163,7 @@ export async function openRepository(did: Did): Promise<Repository> {
   if (open) return open;
 
   const db = await openRepoDatabase(did);
-  const signingKey = await accountsDb.getSigningKey(did);
+  const signingKey = await mainDb.getSigningKey(did);
   if (!signingKey) throw new Error("no signing key for did: " + did);
 
   const repo = new Repository(db, signingKey);

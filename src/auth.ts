@@ -4,8 +4,9 @@ import { appConfig } from "./config.ts";
 import { Did, DidSchema } from "./util/did.ts";
 import { decodeJwt, verifyJwtHS256Signature } from "./util/jwt.ts";
 
+// TODO: what else does this need?
 type AuthInfo = {
-  account: Did;
+  did: Did;
 };
 
 const dpopAuthJwtHeader = j
@@ -21,9 +22,9 @@ const dpopAuthJwtPayload = j
   })
   .$pipe(j.compile);
 
-export const authenticationInfo = new WeakMap<Request, AuthInfo>();
+export const apiAuthenticationInfo = new WeakMap<Request, AuthInfo>();
 
-export const authMiddleware: Middleware = async (ctx, next) => {
+export const apiAuthMiddleware: Middleware = async (ctx, next) => {
   const authorizationHeader = ctx.response.headers.get("authorization");
   if (!authorizationHeader) return next();
 
@@ -41,7 +42,7 @@ export const authMiddleware: Middleware = async (ctx, next) => {
 
       if (!(await verifyJwtHS256Signature(appConfig.jwtSecret, jwt)))
         throw new Error("bad jwt signature");
-      authenticationInfo.set(ctx.request, { account: payload.sub });
+      apiAuthenticationInfo.set(ctx.request, { did: payload.sub });
     } catch (err) {
       console.warn(err);
 

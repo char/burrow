@@ -1,20 +1,20 @@
 import { Application, Router } from "@oak/oak";
 import { appConfig } from "../config.ts";
-import { accountsDb } from "../db/accounts.ts";
+import { mainDb } from "../db/main_db.ts";
 import { Did, DidDocument } from "../util/did.ts";
 
 export function setupDidWebRoutes(_app: Application, router: Router) {
   router.get("/.well-known/did.json", async ctx => {
     const host = ctx.request.headers.get("host");
     const did: Did = `did:web:${host}`;
-    const account = accountsDb.getAccount(did);
+    const account = mainDb.getAccount(did);
     if (!account) {
       ctx.response.body = "Not Found";
       ctx.response.status = 404;
       return;
     }
 
-    const key = await accountsDb.getSigningKey(did);
+    const key = await mainDb.getSigningKey(did);
     if (!key) {
       ctx.response.body = "Internal Server Error: no signing key";
       ctx.response.status = 500;

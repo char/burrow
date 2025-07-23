@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="/static/css/styles.css" />
+<title>Sign in</title>
+
+<main>
+  <h1>Sign in</h1>
+
+  <form action="/auth/sign-in" method="POST">
+    {{ if redirect }}
+      <input type="hidden" name="redirect" value="{{ redirect }}">
+    {{ /if }}
+
+    <div>
+      <label for="identifier">Identifier</label>
+      <input type="text" id="identifier" name="identifier" placeholder="did:…" {{ if prefillIdent }}value="{{ prefillIdent }}"{{ /if }} required />
+    </div>
+
+    <div>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" />
+    </div>
+
+    <div>
+      <button type="submit">Sign in</button>
+    </div>
+  </form>
+</main>

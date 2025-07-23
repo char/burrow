@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="/static/css/styles.css" />
+<title>Authorize</title>
+
+<main>
+  <h1>Authorize</h1>
+  <form action="/oauth/authorize" method="POST">
+    <input type="hidden" name="code" value="{{ code }}" />
+    
+    <p><strong>{{ request.client_id }}</strong> is asking for permission to authenticate.</p>
+    <p>You are signed in as: <strong>{{ currentUser }}</strong></p>
+
+    {{# <div>
+      <p>scopes:</p>
+      <ul>
+        {{ for scope of request.scopes.split(" ") }}
+          <li>{{ scope }}</li>
+        {{ /for }}
+      </ul>
+    </div> #}}
+
+    <div>
+      <button type="submit">Authorize</button>
+    </div>
+  </form>
+</main>

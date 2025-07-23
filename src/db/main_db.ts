@@ -14,7 +14,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     password_hash BLOB NOT NULL,
     -- no email_confirmed_at because all emails are confirmed
-    deactivated_at INTEGER,
+    deactivated_at INTEGER, -- unix ms
     signing_key BLOB NOT NULL,
     signing_key_type TEXT NOT NULL
   ) STRICT;
@@ -23,7 +23,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS oauth_pars (
     uri TEXT NOT NULL,
     request TEXT NOT NULL, -- json
-    expires_at INTEGER NOT NULL
+    expires_at INTEGER NOT NULL -- unix ms
   ) STRICT;
 `);
 db.exec(`
@@ -34,6 +34,14 @@ db.exec(`
     request TEXT NOT NULL, -- json
     request_uri TEXT NOT NULL UNIQUE
   ) STRICT;
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS oauth_refresh (
+    refresh_token TEXT NOT NULL UNIQUE,
+    for TEXT NOT NULL, -- did
+    expires_at INTEGER NOT NULL, -- unix ms
+    scope TEXT NOT NULL
+    ) STRICT;
 `);
 
 const AccountModel = j.obj({
@@ -176,6 +184,24 @@ const retrieveOAuthCode = db.prepare("SELECT * FROM oauth_codes WHERE code = ?")
   };
 });
 
+const insertOAuthRefresh = db
+  .prepare(
+    "INSERT INTO oauth_refresh (refresh_token, for, scope, expires_at) VALUES (?, ?, ?, ?)",
+  )
+  .$pipe(stmt => {
+    return (refreshToken: string, did: Did, scope: string, expiresAt: number) => {
+      void stmt.run(refreshToken, did, scope, expiresAt);
+    };
+  });
+
+const getOAuthRefresh = db
+  .prepare("SELECT * FROM oauth_refresh WHERE refresh_token = ?")
+  .$pipe(stmt => {
+    return (refreshToken: string) => {
+      return stmt.get<{ for: string; expiresAt: number; scope: string }>(refreshToken);
+    };
+  });
+
 export const mainDb = {
   db,
   getAccount,
@@ -188,4 +214,6 @@ export const mainDb = {
   insertOAuthCode,
   activateOAuthCode,
   retrieveOAuthCode,
+  insertOAuthRefresh,
+  getOAuthRefresh,
 };

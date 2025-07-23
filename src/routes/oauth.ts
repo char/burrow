@@ -231,10 +231,12 @@ export function setupOAuthRoutes(app: Application, router: Router) {
     }
 
     const code = mainDb.retrieveOAuthCode(value.code);
-    if (!code) return; // todo
-    if (code.authorized_at === null) return; // todo
+    if (!code) return; // FIXME: return error response
+    if (code.authorized_at === null) return; // ^
     assert(code.authorized_by !== null);
     const request = oauthPushedRequestSchema(code.request).value!;
+
+    mainDb.db.run("DELETE FROM oauth_codes WHERE code = ?", code.code);
 
     const header = { typ: "at+jwt", alg: "HS256" };
     const now = Math.floor(Date.now() / 1000);
@@ -246,10 +248,18 @@ export function setupOAuthRoutes(app: Application, router: Router) {
       exp: now + expiry,
       // FIXME: cnf.jkt excluded for now because atcute doesn't care
       iss: appConfig.baseUrl,
+      _scope: request.scope,
     };
 
+    const refreshToken = "refresh-" + nanoid(32);
+    mainDb.insertOAuthRefresh(
+      refreshToken,
+      code.authorized_by!,
+      request.scope,
+      Date.now() + 365 * 24 * 60 * 60 * 1000,
+    );
+
     const accessToken = await signJwtHS256(appConfig.jwtSecret, header, payload);
-    const refreshToken = "idc rn"; // FIXME
 
     ctx.response.type = "application/json";
     ctx.response.body = {

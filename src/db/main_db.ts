@@ -31,13 +31,8 @@ db.exec(`
     code TEXT NOT NULL UNIQUE,
     authorized_at INTEGER DEFAULT NULL,
     authorized_by TEXT DEFAULT NULL,
-    state TEXT NOT NULL,
-    client_id TEXT NOT NULL,
-    code_challenge TEXT NOT NULL,
-    code_challenge_method TEXT NOT NULL,
-    redirect_uri TEXT NOT NULL,
-    response_mode TEXT NOT NULL,
-    scope TEXT NOT NULL
+    request TEXT NOT NULL, -- json
+    request_uri TEXT NOT NULL UNIQUE
   ) STRICT;
 `);
 
@@ -150,47 +145,15 @@ const lookupLocalDid = db.prepare("SELECT did FROM accounts WHERE handle = ?").$
   };
 });
 
-const StoredOAuthCodeModel = j.obj({
-  code: j.string,
-  authorized_at: j.union(j.literal(null), j.number),
-  authorized_by: j.union(j.literal(null), DidSchema),
-  client_id: j.string,
-  state: j.string,
-  code_challenge: j.string,
-  code_challenge_method: j.string,
-  redirect_uri: j.string,
-  response_mode: j.union(j.literal("query"), j.literal("fragment")),
-  scope: j.string,
-});
-const parseOAuthCode = j.compile(StoredOAuthCodeModel);
-
 const insertOAuthCode = db
   .prepare(
-    `INSERT INTO oauth_codes
-    (code, client_id, state, code_challenge, code_challenge_method, redirect_uri, response_mode, scope)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO oauth_codes
+    (code, request, request_uri)
+    VALUES (?, ?, ?)`,
   )
   .$pipe(stmt => {
-    return (
-      code: string,
-      clientId: string,
-      state: string,
-      codeChallenge: string,
-      codeChallengeMethod: string,
-      redirectUri: string,
-      responseMode: "query" | "fragment",
-      scope: string,
-    ) =>
-      void stmt.run(
-        code,
-        clientId,
-        state,
-        codeChallenge,
-        codeChallengeMethod,
-        redirectUri,
-        responseMode,
-        scope,
-      );
+    return (code: string, request: object, requestUri: string) =>
+      void stmt.run(code, JSON.stringify(request), requestUri);
   });
 
 const activateOAuthCode = db
@@ -201,10 +164,15 @@ const activateOAuthCode = db
 
 const retrieveOAuthCode = db.prepare("SELECT * FROM oauth_codes WHERE code = ?").$pipe(stmt => {
   return (code: string) => {
-    const result = stmt.get(code);
+    const result = stmt.get<{
+      code: string;
+      authorized_at: number;
+      authorized_by: Did | undefined;
+      request: string;
+    }>(code);
     if (!result) return undefined;
-    const { value } = parseOAuthCode(result);
-    return value;
+    const request = JSON.parse(result.request) as object;
+    return { ...result, request };
   };
 });
 

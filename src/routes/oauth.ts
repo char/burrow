@@ -58,10 +58,7 @@ export function setupOAuthRoutes(app: Application, router: Router) {
       response_types_supported: ["code"],
       response_modes_supported: ["query", "fragment"],
       grant_types_supported: ["authorization_code", "refresh_token"],
-      code_challenge_methods_supported: [
-        "S256",
-        // "plain",
-      ],
+      code_challenge_methods_supported: ["S256", "plain"],
       ui_locales_supported: ["en-US"],
       display_values_supported: ["page"],
 
@@ -93,10 +90,11 @@ export function setupOAuthRoutes(app: Application, router: Router) {
     const token = nanoid(24);
 
     const uri = "urn:ietf:params:oauth:request_uri:" + token;
-    mainDb.insertOAuthRequest(uri, body, Date.now() + 300_000);
+    void mainDb.db.run("DELETE FROM oauth_pars WHERE expires_at < ?", Date.now());
+    mainDb.insertOAuthRequest(uri, body, Date.now() + 3600_000);
 
     ctx.response.type = "application/json";
-    ctx.response.body = { request_uri: uri, expires_in: 300 };
+    ctx.response.body = { request_uri: uri, expires_in: 3600 };
     ctx.response.status = 201;
   });
 
@@ -135,27 +133,29 @@ export function setupOAuthRoutes(app: Application, router: Router) {
       return;
     }
 
-    // TODO: fetch client metadata doc and validate redirect uri etcetcetc
+    // FIXME: fetch client metadata doc and validate redirect uri etcetcetc
 
     const code = "cod-" + nanoid(24);
-    mainDb.insertOAuthCode(
-      code,
-      request.client_id,
-      request.state,
-      request.code_challenge,
-      request.code_challenge_method,
-      request.redirect_uri,
-      request.response_mode ?? "query",
-      request.scope,
-    );
+    mainDb.insertOAuthCode(code, request, params.request_uri);
 
     const currentUser = cookieAuthInfo.get(ctx.request);
-    // FIXME: if currentUser undefined or doesn't match loginHint, show login form
+    if (
+      currentUser === undefined ||
+      (request.login_hint && request.login_hint !== currentUser)
+    ) {
+      const { content } = await ventoEnv.run("./src/templates/sign_in.vto", {
+        prefillident: request.login_hint,
+        redirect: ctx.request.url.pathname + ctx.request.url.search,
+      });
+      ctx.response.body = content;
+      return;
+    }
 
     const rendered = await ventoEnv.run("./src/templates/oauth_authorize.vto", {
       code,
       request,
       currentUser,
+      request_uri: params.request_uri,
     });
     ctx.response.body = rendered.content;
   });
@@ -184,17 +184,24 @@ export function setupOAuthRoutes(app: Application, router: Router) {
       ctx.response.body = "no stored code with the given id";
       return;
     }
+    if (code.authorized_by) {
+      ctx.response.status = 409;
+      ctx.response.type = "text/plain";
+      ctx.response.body = "oauth authorization was already granted";
+      return;
+    }
     mainDb.activateOAuthCode(code.code, currentUser);
+    const request = oauthPushedRequestSchema(code.request).value!;
 
     const params = new URLSearchParams();
     params.set("code", code.code);
-    params.set("state", code.state);
+    params.set("state", request.state);
     params.set("iss", appConfig.baseUrl);
 
-    if (code.response_mode === "fragment") {
-      ctx.response.redirect(code.redirect_uri + "#" + params.toString());
-    } else if (code.response_mode === "query") {
-      ctx.response.redirect(code.redirect_uri + "?" + params.toString());
+    if (request.response_mode === "fragment") {
+      ctx.response.redirect(request.redirect_uri + "#" + params.toString());
+    } else if (request.response_mode === "query") {
+      ctx.response.redirect(request.redirect_uri + "?" + params.toString());
     } else {
       throw new Error("unrecognized response_mode");
     }
@@ -220,6 +227,7 @@ export function setupOAuthRoutes(app: Application, router: Router) {
     if (!code) return; // todo
     if (code.authorized_at === null) return; // todo
     assert(code.authorized_by !== null);
+    const request = oauthPushedRequestSchema(code.request).value!;
 
     const header = { typ: "at+jwt", alg: "HS256" };
     const now = Math.floor(Date.now() / 1000);
@@ -241,7 +249,7 @@ export function setupOAuthRoutes(app: Application, router: Router) {
       access_token: accessToken,
       token_type: "DPoP",
       refresh_token: refreshToken,
-      scope: code.scope,
+      scope: request.scope,
       expires_in: expiry,
       sub: code.authorized_by,
     };

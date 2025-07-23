@@ -142,7 +142,6 @@ export class Repository {
     for (const cid of pruned) this.storage.deleteBlock(cid);
 
     // TODO: emit commit on event stream using spawnlist as blocks
-    console.log({ spawned });
   }
 
   getRecordCid(collection: string, rkey: string): Cid | undefined {

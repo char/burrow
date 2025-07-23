@@ -9,16 +9,21 @@
     <input type="hidden" name="code" value="{{ code }}" />
     
     <p><strong>{{ request.client_id }}</strong> is asking for permission to authenticate.</p>
-    <p>You are signed in as: <strong>{{ currentUser }}</strong></p>
+    <p>
+      You are signed in as: <strong>{{ currentUser }}</strong>.
+      (Or <a href="/auth/sign-in?redir={{ encodeURIComponent("/oauth/authorize?" +
+        new URLSearchParams({ client_id: request.client_id, request_uri }).toString())
+      }}">switch account</a>)
+    </p>
 
-    {{# <div>
-      <p>scopes:</p>
+    <div>
+      <p>Scopes:</p>
       <ul>
-        {{ for scope of request.scopes.split(" ") }}
-          <li>{{ scope }}</li>
+        {{ for scope of request.scope.split(" ") }}
+          <li><code>{{ scope }}</code></li>
         {{ /for }}
       </ul>
-    </div> #}}
+    </div>
 
     <div>
       <button type="submit">Authorize</button>

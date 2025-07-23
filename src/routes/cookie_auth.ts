@@ -14,7 +14,9 @@ export function setupCookieAuthRoutes(app: Application, router: Router) {
   });
 
   router.get("/auth/sign-in", async ctx => {
-    const { content } = await ventoEnv.run("./src/templates/sign_in.vto", {});
+    const { content } = await ventoEnv.run("./src/templates/sign_in.vto", {
+      redirect: ctx.request.url.searchParams.get("redir") ?? undefined,
+    });
     ctx.response.type = "text/html";
     ctx.response.body = content;
   });

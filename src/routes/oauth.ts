@@ -105,59 +105,66 @@ export function setupOAuthRoutes(app: Application, router: Router) {
     }),
   );
   router.get("/oauth/authorize", oauthCorsMiddleware, async ctx => {
-    const { value: params, errors: paramsErrors } = oauthParams({
-      client_id: ctx.request.url.searchParams.get("client_id") ?? undefined,
-      request_uri: ctx.request.url.searchParams.get("request_uri"),
-    });
-
-    ctx.response.type = "text/html";
-
-    if (paramsErrors) {
-      console.warn({ paramsErrors });
-      // TODO: render authorize_error template
-      ctx.response.body = "";
-      return;
-    }
-
-    const requestObj = mainDb.getOAuthRequest(params.request_uri);
-    if (requestObj === undefined) {
-      console.warn("request obj undefined");
-      // TODO: render authorize_error template
-      ctx.response.body = "";
-      return;
-    }
-    const { value: request, errors: requestErrors } = oauthPushedRequestSchema(requestObj);
-    if (requestErrors) {
-      // TODO: render authorize_error template
-      ctx.response.body = "";
-      return;
-    }
-
-    // FIXME: fetch client metadata doc and validate redirect uri etcetcetc
-
-    const code = "cod-" + nanoid(24);
-    mainDb.insertOAuthCode(code, request, params.request_uri);
-
-    const currentUser = cookieAuthInfo.get(ctx.request);
-    if (
-      currentUser === undefined ||
-      (request.login_hint && request.login_hint !== currentUser)
-    ) {
-      const { content } = await ventoEnv.run("./src/templates/sign_in.vto", {
-        prefillident: request.login_hint,
-        redirect: ctx.request.url.pathname + ctx.request.url.search,
+    try {
+      const { value: params, errors: paramsErrors } = oauthParams({
+        client_id: ctx.request.url.searchParams.get("client_id") ?? undefined,
+        request_uri: ctx.request.url.searchParams.get("request_uri"),
       });
-      ctx.response.body = content;
-      return;
-    }
 
-    const rendered = await ventoEnv.run("./src/templates/oauth_authorize.vto", {
-      code,
-      request,
-      currentUser,
-      request_uri: params.request_uri,
-    });
-    ctx.response.body = rendered.content;
+      ctx.response.type = "text/html";
+
+      if (paramsErrors) {
+        ctx.response.status = 400;
+        throw new Error(
+          "OAuth authorization request has invalid parameters." +
+            "\n" +
+            JSON.stringify(paramsErrors),
+        );
+      }
+
+      const requestObj = mainDb.getOAuthRequest(params.request_uri);
+      if (requestObj === undefined)
+        throw new Error("OAuth authorization request was not found (did it expire?)");
+
+      const { value: request, errors: requestErrors } = oauthPushedRequestSchema(requestObj);
+      if (requestErrors) {
+        ctx.response.status = 500;
+        throw new Error("Internal Server Error");
+      }
+
+      // FIXME: fetch client metadata doc and validate redirect uri etcetcetc
+
+      const code = "cod-" + nanoid(24);
+      mainDb.insertOAuthCode(code, request, params.request_uri);
+
+      const currentUser = cookieAuthInfo.get(ctx.request);
+      if (
+        currentUser === undefined ||
+        (request.login_hint && request.login_hint !== currentUser)
+      ) {
+        const { content } = await ventoEnv.run("./src/templates/sign_in.vto", {
+          prefillident: request.login_hint,
+          redirect: ctx.request.url.pathname + ctx.request.url.search,
+        });
+        ctx.response.body = content;
+        return;
+      }
+
+      const rendered = await ventoEnv.run("./src/templates/oauth_authorize.vto", {
+        code,
+        request,
+        currentUser,
+        request_uri: params.request_uri,
+      });
+      ctx.response.body = rendered.content;
+    } catch (err) {
+      if (err instanceof Error) {
+        const { content } = await ventoEnv.run("./src/templates/oauth_authorize_error.vto", {
+          message: err.message,
+        });
+        ctx.response.body = content;
+      } else throw err;
+    }
   });
 
   router.post("/oauth/authorize", async ctx => {

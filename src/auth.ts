@@ -1,7 +1,7 @@
 import { Middleware, Request } from "@oak/oak";
 import { j } from "./_deps.ts";
 import { appConfig } from "./config.ts";
-import { Did, DidSchema } from "./util/did.ts";
+import { Did, DidSchema, isDid } from "./util/did.ts";
 import { decodeJwt, verifyJwtHS256Signature } from "./util/jwt.ts";
 
 // TODO: what else does this need?
@@ -54,6 +54,14 @@ export const apiAuthMiddleware: Middleware = async (ctx, next) => {
       };
       return;
     }
+  }
+
+  if (appConfig.adminPassword && authorizationHeader.startsWith("Admin ")) {
+    const did = authorizationHeader.substring("Admin ".length);
+    if (ctx.request.headers.get("X-Admin-Password") !== appConfig.adminPassword)
+      throw new Error("bad auth admin password");
+    if (!isDid(did)) throw new Error("bad auth did");
+    apiAuthenticationInfo.set(ctx.request, { did });
   }
 
   return next();

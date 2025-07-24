@@ -17,14 +17,15 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         cid: j.optional(CidSchema),
       },
     },
-    async (_ctx, { params: { repo: did, collection, rkey, cid } }) => {
+    async (_ctx, { params: { repo: did, collection, rkey, cid: requestedCid } }) => {
       const repo = await openRepository(did);
       const record = repo.getRecord(collection, rkey);
-      if (!record || (cid && cid !== repo.getRecordCid(collection, rkey))) {
-        const atUri = `at://${did}/${collection}/${rkey}`;
-        throw new XRPCError("RecordNotFound", "Could not locate record: " + atUri);
+      const uri = `at://${did}/${collection}/${rkey}`;
+      const cid = repo.getRecordCid(collection, rkey);
+      if (!record || (requestedCid && requestedCid !== cid)) {
+        throw new XRPCError("RecordNotFound", "Could not locate record: " + uri);
       }
-      return record;
+      return { uri, cid, value: record };
     },
   );
 

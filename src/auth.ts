@@ -25,7 +25,7 @@ const dpopAuthJwtPayload = j
 export const apiAuthenticationInfo = new WeakMap<Request, AuthInfo>();
 
 export const apiAuthMiddleware: Middleware = async (ctx, next) => {
-  const authorizationHeader = ctx.response.headers.get("authorization");
+  const authorizationHeader = ctx.request.headers.get("authorization");
   if (!authorizationHeader) return next();
 
   if (authorizationHeader.startsWith("DPoP ")) {

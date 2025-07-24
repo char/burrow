@@ -35,8 +35,10 @@ const createSpecParser = (name: string) => (specSchema: Record<string, j.AnySche
   specSchema
     ? j.compile(j.obj(specSchema)).$pipe(f => (v: unknown) => {
         const { value, errors } = f(v);
-        if (errors)
+        if (errors) {
+          console.warn({ v, errors });
           throw new XRPCError("InvalidRequest", "Invalid data for: " + name, { errors });
+        }
         return value;
       })
     : undefined;

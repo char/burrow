@@ -154,6 +154,13 @@ export class Repository {
     const recordCid = map.get(`${collection}/${rkey}`);
     return recordCid?.$pipe(this.storage.getBlock)?.$pipe(CBOR.decode);
   }
+
+  getCurrCommit(): CommitNode | undefined {
+    const cid = this.storage.getCommit();
+    if (!cid) return undefined;
+    const node = this.storage.getBlock(cid)!.$pipe(CBOR.decode) as SignedCommitNode;
+    return node;
+  }
 }
 
 const repoPool = new Map<Did, Repository>();

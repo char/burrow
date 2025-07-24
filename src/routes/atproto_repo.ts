@@ -4,6 +4,7 @@ import { openRepository } from "../repo.ts";
 import { CidSchema } from "../util/cid.ts";
 import { DidSchema } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
+import { apiAuthenticationInfo } from "../auth.ts";
 
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -24,6 +25,60 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("RecordNotFound", "Could not locate record: " + atUri);
       }
       return record;
+    },
+  );
+
+  xrpc.procedure(
+    {
+      method: "com.atproto.repo.putRecord",
+      input: {
+        repo: DidSchema,
+        collection: j.string,
+        rkey: j.string,
+        validate: j.optional(j.boolean),
+        record: j.unknown,
+        swapRecord: j.optional(CidSchema),
+        swapCommit: j.optional(CidSchema),
+      },
+      output: {
+        uri: j.string,
+        cid: CidSchema,
+        commit: j.union(
+          j.literal(null),
+          j.obj({
+            cid: CidSchema,
+            rev: j.string,
+          }),
+        ),
+      },
+    },
+    async (ctx, opts) => {
+      const auth = apiAuthenticationInfo.get(ctx.request);
+      if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
+      const did = opts.input.repo;
+      if (auth.did !== did)
+        throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
+
+      const repo = await openRepository(did);
+      const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
+      repo.mutate([
+        {
+          type: currentCid ? "update" : "create",
+          rkey: opts.input.rkey,
+          collection: opts.input.collection,
+          record: opts.input.record,
+        },
+      ]);
+
+      const uri = `at://${repo.storage.did}/${encodeURIComponent(opts.input.collection)}/${encodeURIComponent(opts.input.rkey)}`;
+      const cid = repo.getRecordCid(opts.input.collection, opts.input.rkey)!;
+      const commit = repo.getCurrCommit()!;
+      return {
+        uri,
+        cid,
+        commit: { cid: commit.data.toCid(), rev: commit.rev },
+        validationStatus: "valid",
+      };
     },
   );
 }

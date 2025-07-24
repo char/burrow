@@ -17,6 +17,8 @@ export const ERROR_TYPES = {
   RecordNotFound: 404,
   MethodNotImplemented: 501,
   InternalServerError: 500,
+
+  AuthMissing: 401,
 } as const;
 
 export class XRPCError extends Error {
@@ -111,15 +113,17 @@ interface XRPCRoute {
   handler: AnyRouteHandler;
 }
 
+type MaybePromise<T> = T | PromiseLike<T>;
+
 type QueryHandler<Q extends QuerySpecIn> = (
   ctx: Context,
   opts: { params: InferSpecType<Q["params"]> },
-) => undefined extends Q["output"] ? unknown : InferSpecType<Q["output"]>;
+) => MaybePromise<undefined extends Q["output"] ? unknown : InferSpecType<Q["output"]>>;
 
 type ProcedureHandler<P extends ProcedureSpecIn> = (
   ctx: Context,
   opts: { params: InferSpecType<P["params"]>; input: InferSpecType<P["input"]> },
-) => undefined extends P["output"] ? unknown : InferSpecType<P["output"]>;
+) => MaybePromise<undefined extends P["output"] ? unknown : InferSpecType<P["output"]>>;
 
 export class XRPCRouter {
   routes = new Map<string, XRPCRoute>();

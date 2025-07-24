@@ -62,7 +62,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
 
       const repo = await openRepository(did);
       const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
-      repo.mutate([
+      await repo.mutate([
         {
           type: currentCid ? "update" : "create",
           rkey: opts.input.rkey,

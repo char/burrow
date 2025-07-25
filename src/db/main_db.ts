@@ -58,6 +58,8 @@ const getAccount = db.prepare("SELECT * FROM accounts WHERE did = ?").$pipe(stmt
   return (did: Did) => {
     const row = stmt.get(did);
     if (row === null) return undefined;
+    // @ts-expect-error untyped
+    delete row.signing_key;
     const { value } = parseAccount(row);
     return value;
   };
@@ -66,7 +68,12 @@ const getAccount = db.prepare("SELECT * FROM accounts WHERE did = ?").$pipe(stmt
 const getAllAccounts = db.prepare("SELECT * FROM accounts").$pipe(stmt => {
   return () => {
     const rows = stmt.all();
-    return rows.map(it => parseAccount(it).value).filter(it => it !== undefined);
+    return rows
+      .map(it => {
+        delete it.signing_key;
+        return parseAccount(it).value;
+      })
+      .filter(it => it !== undefined);
   };
 });
 

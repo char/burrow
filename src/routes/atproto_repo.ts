@@ -38,7 +38,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         rkey: j.string,
         validate: j.optional(j.boolean),
         record: j.unknown,
-        swapRecord: j.optional(j.union(null, CidSchema)),
+        swapRecord: j.optional(j.union(j.literal(null), CidSchema)),
         swapCommit: j.optional(CidSchema),
       },
       output: {

@@ -6,6 +6,14 @@ import { Did, DidDocument } from "../util/did.ts";
 export function setupDidWebRoutes(_app: Application, router: Router) {
   router.get("/.well-known/did.json", async ctx => {
     const host = ctx.request.headers.get("host");
+    const pdsHost = new URL(appConfig.baseUrl).host;
+    if (host === pdsHost) {
+      return {
+        "@context": ["https://www.w3.org/ns/did/v1"],
+        id: `did:web:${encodeURIComponent(pdsHost)}`,
+      } satisfies DidDocument;
+    }
+
     const did: Did = `did:web:${host}`;
     const account = mainDb.getAccount(did);
     if (!account) {

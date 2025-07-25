@@ -107,7 +107,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         handleIsCorrect: j.boolean,
       },
     },
-    async (ctx, opts) => {
+    async (_ctx, opts) => {
       const account = mainDb.getAccount(opts.params.repo);
       if (!account)
         throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);

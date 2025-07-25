@@ -24,7 +24,7 @@ const oauthPushedRequestSchema = j.compile(
   }),
 );
 
-export function setupOAuthRoutes(app: Application, router: Router) {
+export function setupOAuthRoutes(_app: Application, router: Router) {
   const oauthCorsMiddleware: Middleware = (ctx, next) => {
     ctx.response.headers.set("access-control-max-age", "86400");
     ctx.response.headers.set("access-control-allow-headers", "Content-Type,DPoP");

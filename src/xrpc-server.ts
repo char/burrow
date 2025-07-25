@@ -6,7 +6,7 @@ import { j } from "./_deps.ts";
 import { appConfig } from "./config.ts";
 import { isDid, resolveDid } from "./util/did.ts";
 import { logging } from "./util/log.ts";
-import { apiAuthenticationInfo, apiAuthMiddleware } from "./auth.ts";
+import { apiAuthenticationInfo } from "./auth.ts";
 
 const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });
 

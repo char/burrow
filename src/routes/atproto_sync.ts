@@ -36,7 +36,7 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
         ),
       },
     },
-    async (ctx, opts) => {
+    async () => {
       // TODO: paginate
 
       const repos = [];

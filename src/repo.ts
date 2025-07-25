@@ -161,6 +161,17 @@ export class Repository {
     const node = this.storage.getBlock(cid)!.$pipe(CBOR.decode) as SignedCommitNode;
     return node;
   }
+
+  listCollections(): string[] {
+    const map = this.#readCidMap();
+    const collections = new Set(
+      map
+        .keys()
+        .map(it => it.split("/").at(0))
+        .filter(it => it !== undefined),
+    );
+    return Array.from(collections);
+  }
 }
 
 const repoPool = new Map<Did, Repository>();
@@ -168,9 +179,9 @@ export async function openRepository(did: Did): Promise<Repository> {
   const open = repoPool.get(did);
   if (open) return open;
 
-  const db = await openRepoDatabase(did);
   const signingKey = await mainDb.getSigningKey(did);
   if (!signingKey) throw new Error("no signing key for did: " + did);
+  const db = await openRepoDatabase(did);
 
   const repo = new Repository(db, signingKey);
   repoPool.set(did, repo);

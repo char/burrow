@@ -21,6 +21,7 @@ export const ERROR_TYPES = {
   AuthMissing: 401,
 
   InvalidSwap: 400,
+  RepoNotFound: 400,
 } as const;
 
 export class XRPCError extends Error {

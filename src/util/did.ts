@@ -95,11 +95,10 @@ async function resolveDidWeb(did: Did): Promise<DidDocument> {
   const transferEncoding = response.headers.get("transfer-encoding");
   if (transferEncoding === "chunked")
     throw new Error(did + ": `Transfer-Encoding: chunked` is not supported for did:web lookup");
-
   const contentLength = response.headers.get("content-length");
-  if (contentLength === null)
-    throw new Error(did + ": Content-Length header was not included with response");
-  if (Number(contentLength) > 1024 * 1024)
+  if (contentLength === null) {
+    // throw new Error(did + ": Content-Length header was not included with response");
+  } else if (Number(contentLength) > 1024 * 1024)
     throw new Error(did + ": response size exceeded 1MiB");
 
   const doc = await response.json();

@@ -2,9 +2,10 @@ import { Application } from "@oak/oak";
 import { j } from "../_deps.ts";
 import { openRepository } from "../repo.ts";
 import { CidSchema } from "../util/cid.ts";
-import { DidSchema } from "../util/did.ts";
+import { DidSchema, resolveDid } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
 import { apiAuthenticationInfo } from "../auth.ts";
+import { mainDb } from "../db/main_db.ts";
 
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -91,6 +92,37 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         cid,
         commit: { cid: commit.data.toCid(), rev: commit.rev },
         validationStatus: "valid",
+      };
+    },
+  );
+
+  xrpc.query(
+    {
+      method: "com.atproto.repo.describeRepo",
+      params: { repo: DidSchema },
+      output: {
+        handle: j.string,
+        did: DidSchema,
+        didDoc: j.unknown,
+        collections: j.array(j.string),
+        handleIsCorrect: j.boolean,
+      },
+    },
+    async (ctx, opts) => {
+      const account = mainDb.getAccount(opts.params.repo);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+
+      const repo = await openRepository(account.did);
+      const collections = repo.listCollections();
+      const didDoc = await resolveDid(account.did);
+
+      return {
+        handle: account.handle,
+        did: account.did,
+        didDoc,
+        handleIsCorrect: true,
+        collections,
       };
     },
   );

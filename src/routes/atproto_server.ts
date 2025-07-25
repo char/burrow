@@ -24,7 +24,7 @@ export function setupServerRoutes(_app: Application, xrpc: XRPCRouter) {
       },
     },
     () => ({
-      did: `did:web:${encodeURIComponent(new URL(appConfig.baseUrl).origin)}` as const,
+      did: `did:web:${encodeURIComponent(new URL(appConfig.baseUrl).host)}` as const,
       inviteCodeRequired: true,
       phoneVerificationRequired: false,
       availableUserDomains: [],

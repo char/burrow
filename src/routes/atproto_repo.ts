@@ -125,4 +125,36 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
       };
     },
   );
+
+  xrpc.query(
+    {
+      method: "com.atproto.repo.listRecords",
+      params: {
+        repo: DidSchema,
+        collection: j.string,
+        limit: j.optional(j.number),
+        cursor: j.optional(j.string),
+        reverse: j.optional(j.boolean),
+      },
+      output: {
+        cursor: j.string,
+        records: j.array(
+          j.obj({
+            uri: j.string,
+            cid: CidSchema,
+            value: j.unknown,
+          }),
+        ),
+      },
+    },
+    async (ctx, opts) => {
+      // TODO: pagination
+      const account = mainDb.getAccount(opts.params.repo);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+
+      const repo = await openRepository(account.did);
+      return { cursor: "", records: repo.listRecords(opts.params.collection) };
+    },
+  );
 }

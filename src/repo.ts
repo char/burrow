@@ -5,6 +5,7 @@ import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
 import { Cid, createCid } from "./util/cid.ts";
 import { Did } from "./util/did.ts";
+import { atUri, AtUri } from "./util/at-uri.ts";
 
 interface CommitNode {
   did: Did;
@@ -171,6 +172,25 @@ export class Repository {
         .filter(it => it !== undefined),
     );
     return Array.from(collections);
+  }
+
+  listRecords(collection: string): { uri: AtUri; cid: Cid; value: unknown }[] {
+    const map = this.#readCidMap();
+
+    const records = [];
+    for (const [key, cid] of map.entries()) {
+      if (!key.startsWith(collection + "/")) continue;
+      const [rcoll, ...rkey] = key.split("/");
+      const block = this.storage.getBlock(cid);
+      if (!block) continue;
+      records.push({
+        uri: atUri`${this.storage.did}/${rcoll}/${rkey.join("/")}`,
+        cid,
+        value: CBOR.decode(block),
+      });
+    }
+
+    return records;
   }
 }
 

@@ -89,7 +89,7 @@ async function resolveDidWeb(did: Did): Promise<DidDocument> {
   // else url.pathname = "/" + path.map(decodeURIComponent).join("/") + "/did.json";
 
   const response = await runWithTimeout(fetch(url), 5000).$mapErr(
-    () => new Error(did + ": fetch timed out"),
+    cause => new Error(did + ": fetch failed", { cause }),
   );
 
   const transferEncoding = response.headers.get("transfer-encoding");
@@ -101,7 +101,9 @@ async function resolveDidWeb(did: Did): Promise<DidDocument> {
   } else if (Number(contentLength) > 1024 * 1024)
     throw new Error(did + ": response size exceeded 1MiB");
 
-  const doc = await response.json();
+  const doc = await runWithTimeout(response.json(), 5000).$mapErr(
+    cause => new Error(did + ": failed to read response", { cause }),
+  );
   const { value, errors } = parseDidDocument(doc);
   if (errors) throw new DidDocumentInvalid(did, errors);
   DID_CACHE.set(did, { doc: value, exp: performance.now() + TWELVE_HOURS_MS });

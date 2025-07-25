@@ -1,3 +1,4 @@
+import { runWithTimeout } from "./async.ts";
 import { Did, isDid } from "./did.ts";
 
 const handleCache = new Map<string, { did: Did; expiresAt: number }>();
@@ -17,7 +18,8 @@ export async function resolveHandle(handle: string): Promise<Did | undefined> {
       .then(r => r.json())
       .then(r => (r.Status === 0 ? (r.Answer.data as string) : undefined))
       .then(txt => txt && /"did=(.*)"/.exec(txt)?.[1])
-      .then(did => (isDid(did) ? did : undefined)),
+      .then(did => (isDid(did) ? did : undefined))
+      .$pipe(it => runWithTimeout(it, 5000)),
     fetch(
       new URL("https://example.com/.well-known/atproto-did").$tap(u => {
         u.hostname = handle;
@@ -25,7 +27,8 @@ export async function resolveHandle(handle: string): Promise<Did | undefined> {
     )
       .then(r => r.text())
       .then(txt => txt.trim())
-      .then(did => (isDid(did) ? did : undefined)),
+      .then(did => (isDid(did) ? did : undefined))
+      .$pipe(it => runWithTimeout(it, 5000)),
   ]);
 
   return results

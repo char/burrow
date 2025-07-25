@@ -208,9 +208,8 @@ export class XRPCRouter {
       const lxm = matches.pathname.groups.lxm!;
       const route = this.routes.get(lxm);
       try {
-        ctx.response.headers.set("access-control-allow-origin", "*");
         if (ctx.request.method === "OPTIONS") {
-          ctx.response.headers.set("access-control-max-age", "600");
+          ctx.response.headers.set("access-control-max-age", "86400");
           const methods = route
             ? route.type === "query"
               ? ["OPTIONS", "GET", "HEAD"]

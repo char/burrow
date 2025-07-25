@@ -14,6 +14,7 @@ import { setupOAuthRoutes } from "./routes/oauth.ts";
 import { setupTestRoutes } from "./routes/test.ts";
 import { XRPCRouter } from "./xrpc-server.ts";
 import { setupServerRoutes } from "./routes/atproto_server.ts";
+import { setupSyncRoutes } from "./routes/atproto_sync.ts";
 
 const app = new Application({ keys: [appConfig.cookieSecret] });
 const xrpc = new XRPCRouter();
@@ -61,6 +62,7 @@ setupTestRoutes(app, router);
 setupDidWebRoutes(app, router);
 setupServerRoutes(app, xrpc);
 setupRepoRoutes(app, xrpc);
+setupSyncRoutes(app, xrpc);
 
 app.use(xrpc.middleware());
 app.use(router.routes());

@@ -63,6 +63,13 @@ const getAccount = db.prepare("SELECT * FROM accounts WHERE did = ?").$pipe(stmt
   };
 });
 
+const getAllAccounts = db.prepare("SELECT * FROM accounts").$pipe(stmt => {
+  return () => {
+    const rows = stmt.all();
+    return rows.map(it => parseAccount(it).value).filter(it => it !== undefined);
+  };
+});
+
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { RepoSigningKey } from "../repo.ts";
@@ -205,6 +212,7 @@ const getOAuthRefresh = db
 export const mainDb = {
   db,
   getAccount,
+  getAllAccounts,
   createAccount,
   getSigningKey,
   insertOAuthRequest,

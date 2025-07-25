@@ -17,8 +17,9 @@ export const ERROR_TYPES = {
   RecordNotFound: 404,
   MethodNotImplemented: 501,
   InternalServerError: 500,
-
   AuthMissing: 401,
+
+  InvalidSwap: 400,
 } as const;
 
 export class XRPCError extends Error {

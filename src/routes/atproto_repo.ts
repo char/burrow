@@ -61,7 +61,15 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
 
       const repo = await openRepository(did);
+
+      const currentCommit = repo.getCurrCommit()?.data?.toCid();
+      if (opts.input.swapCommit && currentCommit !== opts.input.swapCommit)
+        throw new XRPCError("InvalidSwap", `Commit was at ${currentCommit ?? "null"}`);
+
       const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
+      if (opts.input.swapRecord && currentCid !== opts.input.swapRecord)
+        throw new XRPCError("InvalidSwap", `Record was at ${currentCid ?? "null"}`);
+
       await repo.mutate([
         {
           type: currentCid ? "update" : "create",
@@ -71,7 +79,9 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         },
       ]);
 
-      const uri = `at://${repo.storage.did}/${encodeURIComponent(opts.input.collection)}/${encodeURIComponent(opts.input.rkey)}`;
+      // prettier-ignore
+      const uri = `at://${repo.storage.did}/${
+        encodeURIComponent(opts.input.collection)}/${encodeURIComponent(opts.input.rkey)}`;
       const cid = repo.getRecordCid(opts.input.collection, opts.input.rkey)!;
       const commit = repo.getCurrCommit()!;
       return {

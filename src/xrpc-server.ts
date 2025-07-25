@@ -6,6 +6,7 @@ import { j } from "./_deps.ts";
 import { appConfig } from "./config.ts";
 import { isDid, resolveDid } from "./util/did.ts";
 import { logging } from "./util/log.ts";
+import { apiAuthenticationInfo, apiAuthMiddleware } from "./auth.ts";
 
 const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });
 
@@ -221,7 +222,10 @@ export class XRPCRouter {
           return;
         }
 
-        if (!route) return await this.#handleProxy(ctx, lxm);
+        if (!route) {
+          if (apiAuthenticationInfo.has(ctx.request)) return await this.#handleProxy(ctx, lxm);
+          throw new XRPCError("MethodNotImplemented", "Method Not Implemented");
+        }
 
         let output = undefined;
 

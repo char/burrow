@@ -38,7 +38,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         rkey: j.string,
         validate: j.optional(j.boolean),
         record: j.unknown,
-        swapRecord: j.optional(CidSchema),
+        swapRecord: j.optional(j.union(null, CidSchema)),
         swapCommit: j.optional(CidSchema),
       },
       output: {
@@ -67,7 +67,9 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("InvalidSwap", `Commit was at ${currentCommit ?? "null"}`);
 
       const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
-      if (opts.input.swapRecord && currentCid !== opts.input.swapRecord)
+      // undefined implies we don't want to check, null implies we want to ensure it didn't exist before
+      const swapRecord = opts.input.swapRecord ?? undefined;
+      if (opts.input.swapRecord !== undefined && currentCid !== swapRecord)
         throw new XRPCError("InvalidSwap", `Record was at ${currentCid ?? "null"}`);
 
       await repo.mutate([

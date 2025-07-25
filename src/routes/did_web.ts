@@ -10,7 +10,7 @@ export function setupDidWebRoutes(_app: Application, router: Router) {
     if (host === pdsHost) {
       return {
         "@context": ["https://www.w3.org/ns/did/v1"],
-        id: `did:web:${encodeURIComponent(pdsHost)}`,
+        id: appConfig.did,
       } satisfies DidDocument;
     }
 

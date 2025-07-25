@@ -6,6 +6,7 @@ import { DidSchema, resolveDid } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
 import { apiAuthenticationInfo } from "../auth.ts";
 import { mainDb } from "../db/main_db.ts";
+import { atUri } from "../util/at-uri.ts";
 
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -21,7 +22,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
     async (_ctx, { params: { repo: did, collection, rkey, cid: requestedCid } }) => {
       const repo = await openRepository(did);
       const record = repo.getRecord(collection, rkey);
-      const uri = `at://${did}/${collection}/${rkey}`;
+      const uri = atUri`${did}/${collection}/${rkey}`;
       const cid = repo.getRecordCid(collection, rkey);
       if (!record || (requestedCid && requestedCid !== cid)) {
         throw new XRPCError("RecordNotFound", "Could not locate record: " + uri);
@@ -82,9 +83,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         },
       ]);
 
-      // prettier-ignore
-      const uri = `at://${repo.storage.did}/${
-        encodeURIComponent(opts.input.collection)}/${encodeURIComponent(opts.input.rkey)}`;
+      const uri = atUri`${repo.storage.did}/${opts.input.collection}/${opts.input.rkey}`;
       const cid = repo.getRecordCid(opts.input.collection, opts.input.rkey)!;
       const commit = repo.getCurrCommit()!;
       return {

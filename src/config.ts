@@ -30,7 +30,7 @@ async function loadOrGenerate(v: string, gen: () => string | Promise<string>): P
   return value;
 }
 
-export const appConfig = {
+const env = {
   baseUrl: load("BURROW_BASE_URL"),
   dataDir: load("BURROW_DATA_DIR", "./data"),
   port: Number(load("PORT", "3000")),
@@ -39,4 +39,9 @@ export const appConfig = {
   adminPassword: Deno.env.get("BURROW_ADMIN_PASSWORD"),
   cookieSecret: await loadOrGenerate("BURROW_COOKIE_SECRET", () => nanoid(24)),
   jwtSecret: await loadOrGenerate("BURROW_JWT_SECRET", () => nanoid(24)).then(encodeUtf8),
+};
+
+export const appConfig = {
+  ...env,
+  did: `did:web:${encodeURIComponent(new URL(env.baseUrl).host)}` as const,
 };

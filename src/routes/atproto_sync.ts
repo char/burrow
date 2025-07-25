@@ -44,7 +44,12 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
         const repo = await openRepository(account.did);
         const commit = repo.getCurrCommit();
         if (!commit) continue;
-        repos.push({ did: account.did, head: commit.data.toCid(), rev: commit.rev });
+        repos.push({
+          did: account.did,
+          head: commit.data.toCid(),
+          rev: commit.rev,
+          active: account.deactivated_at === null,
+        });
       }
       return { cursor: "", repos };
     },

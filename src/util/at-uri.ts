@@ -10,7 +10,7 @@ export const atUri = (strings: TemplateStringsArray, ...args: unknown[]): AtUri 
   for (let i = 0; i < strings.length; i++) {
     uri += strings[i];
     const v = args[i];
-    if (v !== undefined) uri += encodeURIComponent(String(v));
+    if (v !== undefined) uri += i === 0 ? String(v) : encodeURIComponent(String(v));
   }
   assert(isAtUri(uri));
   return uri;

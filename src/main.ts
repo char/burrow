@@ -21,6 +21,8 @@ const xrpc = new XRPCRouter();
 const router = new Router();
 
 app.use(async (ctx, next) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+
   try {
     return await next();
   } catch (err) {

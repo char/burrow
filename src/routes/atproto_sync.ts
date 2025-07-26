@@ -72,13 +72,14 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
       if (!account)
         throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
       const repo = await openRepository(account.did);
-      const root = repo.storage.getCommit();
-      if (!root)
+      const rootCid = repo.storage.getCommit();
+      const root = repo.getCurrCommit();
+      if (!rootCid || !root)
         throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
 
       const blocks = findKey(
         repo.storage,
-        root,
+        root.data.toCid(),
         opts.params.collection + "/" + opts.params.rkey,
       );
 
@@ -89,9 +90,11 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("RecordNotFound", `Could not find record`);
       blocks.push([recordCid, recordBlock]);
 
+      blocks.unshift([rootCid, repo.storage.getBlock(rootCid)!]);
+
       const parts: Uint8Array[] = [];
 
-      const header = CBOR.encode({ version: 1, roots: [root] });
+      const header = CBOR.encode({ version: 1, roots: [CidLink.fromCid(rootCid)] });
       const headerLen = new Uint8Array(10).$pipe(b =>
         b.subarray(0, varint.encode(header.byteLength, b)),
       );

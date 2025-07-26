@@ -278,7 +278,8 @@ export class XRPCRouter {
             message: "Internal Server Error",
           };
 
-          logging.warn("[xrpc] unhandled error: " + err);
+          // logging.warn("[xrpc] unhandled error: " + err);
+          console.warn(err);
         }
       }
     };

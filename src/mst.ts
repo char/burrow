@@ -98,7 +98,7 @@ function insertEntry(node: Node, entry: Entry): Node {
   assert(node.height === entry.height);
   if (node.entries.length !== 0) {
     const last = node.entries.at(-1)!;
-    assert(entry.key > last.key);
+    assert(decodeUtf8From(entry.key) > decodeUtf8From(last.key));
   }
   node.entries.push(entry);
   return node;
@@ -110,7 +110,11 @@ export function generateMST(
   newBlocks?: Cid[],
 ): CidLink {
   let root: Node | undefined;
-  for (const [key, val] of map.entries()) {
+  const keys = [...map.keys()];
+  keys.sort();
+  for (const key of keys) {
+    const val = map.get(key)!;
+
     const keyBytes = encodeUtf8(key);
     const height = sha256LeadingZeros(key);
     const entry: Entry = {
@@ -199,11 +203,19 @@ export function findKey(
   const node: MSTNode | undefined = block?.$pipe(CBOR.decode);
   if (!block || !node) return [];
 
+  if (node.l) {
+    const left = findKey(repo, node.l.toCid(), targetKey)
+    if (left.length) {
+      left.push([rootCid, block]);
+      return left;
+    }
+  }
+
   let index: number | undefined;
   let foundKey: string | undefined;
   {
     let key = "";
-    for (let i = 0; i <= node.e.length; i++) {
+    for (let i = 0; i < node.e.length; i++) {
       const entry = node.e[i];
       const prefix = key.substring(0, entry.p);
       key = prefix + decodeUtf8From(CBOR.fromBytes(entry.k));
@@ -213,7 +225,7 @@ export function findKey(
         break;
       }
     }
-    if (!index) index = node.e.length;
+    if (index === undefined) index = node.e.length;
   }
 
   const stack: [Cid, Uint8Array][] = [];
@@ -226,7 +238,7 @@ export function findKey(
     else stack.push(...findKey(repo, prev.t.toCid(), targetKey));
   }
 
-  stack.push([rootCid, block] as const);
+  stack.push([rootCid, block]);
 
   return stack;
 }

@@ -36,7 +36,7 @@ export async function signJwtHS256(
   header: object,
   payload: object,
 ): Promise<string> {
-  const message = `${header.$json}.${payload.$json}`;
+  const message = `${toBase64Url(encodeUtf8(header.$json))}.${toBase64Url(encodeUtf8(payload.$json))}`;
   const alg = { name: "HMAC", hash: "SHA-256" };
   const signature = await crypto.subtle.sign(
     alg,

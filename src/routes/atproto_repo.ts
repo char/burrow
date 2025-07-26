@@ -147,7 +147,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         ),
       },
     },
-    async (ctx, opts) => {
+    async (_ctx, opts) => {
       // TODO: pagination
       const account = mainDb.getAccount(opts.params.repo);
       if (!account)

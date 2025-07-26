@@ -1,4 +1,4 @@
-import { concat, decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
+import { decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
 import { assert, Bytes, CBOR, CidLink } from "./_deps.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
@@ -204,7 +204,7 @@ export function findKey(
   if (!block || !node) return [];
 
   if (node.l) {
-    const left = findKey(repo, node.l.toCid(), targetKey)
+    const left = findKey(repo, node.l.toCid(), targetKey);
     if (left.length) {
       left.push([rootCid, block]);
       return left;

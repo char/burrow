@@ -190,6 +190,7 @@ export class Repository {
       });
     }
 
+    records.reverse();
     return records;
   }
 }

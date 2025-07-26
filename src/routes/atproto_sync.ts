@@ -6,7 +6,6 @@ import { CidSchema } from "../util/cid.ts";
 import { openRepository } from "../repo.ts";
 import { mainDb } from "../db/main_db.ts";
 import { findKey } from "../mst.ts";
-import { toCidLink } from "@atcute/cbor";
 import { concat } from "@atcute/uint8array";
 
 export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {

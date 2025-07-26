@@ -83,11 +83,10 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
       );
 
       const recordCid = repo.getRecordCid(opts.params.collection, opts.params.rkey);
-      if (!recordCid) throw new XRPCError("RecordNotFound", `Could not find record`);
       const recordBlock = recordCid?.$pipe(repo.storage.getBlock);
-      if (!recordCid || !recordBlock)
-        throw new XRPCError("RecordNotFound", `Could not find record`);
-      blocks.push([recordCid, recordBlock]);
+      if (recordCid && recordBlock) {
+        blocks.push([recordCid, recordBlock]);
+      }
 
       blocks.unshift([rootCid, repo.storage.getBlock(rootCid)!]);
 

@@ -166,8 +166,8 @@ export class Repository {
 
           const existingCid = map.get(`${w.collection}/${w.rkey}`);
           if (
-            (!existingCid && w.swapRecord === undefined) ||
-            (existingCid ?? null) !== w.swapRecord
+            (w.swapRecord !== undefined && (existingCid ?? null) !== w.swapRecord) ||
+            (w.swapRecord === undefined && existingCid === undefined)
           )
             throw new XRPCError("InvalidSwap", `Record was at ${existingCid ?? "null"}`, {
               uri,

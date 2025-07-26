@@ -1,8 +1,9 @@
 import { Database } from "@db/sqlite";
 import { fs, path } from "../_deps.ts";
 import { appConfig } from "../config.ts";
-import { Cid } from "../util/cid.ts";
+import { Cid, cidToString, encodeCidFromDigest } from "../util/cid.ts";
 import { Did } from "../util/did.ts";
+import { toArrayBuffer } from "jsr:@std/streams@1/to-array-buffer";
 
 export interface RepoStorage {
   did: Did;
@@ -17,6 +18,8 @@ export interface RepoStorage {
   setCommit: (cid: Cid) => void;
 
   listBlobs: (limit: number, cursor?: string) => Cid[];
+  createBlob: (cid: Cid | null, mime: string) => number | undefined;
+  writeBlob: (id: number, data: ReadableStream) => Promise<[cid: Cid, size: number]>;
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
@@ -26,11 +29,13 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   db.exec(`pragma synchronous = NORMAL;`);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blobs (
-      cid TEXT NOT NULL UNIQUE,
+      rowid INTEGER NOT NULL PRIMARY KEY,
+      cid TEXT,
       mime TEXT NOT NULL,
       refs INTEGER NOT NULL DEFAULT 0,
       data BLOB
     ) STRICT;
+    CREATE INDEX IF NOT EXISTS blob_cid ON blobs (cid);
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blob_refs (
@@ -65,8 +70,12 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   );
 
   const listBlobsStatement = db.prepare(
-    "SELECT cid FROM blobs WHERE refs > 0 AND cid > ? ORDER BY cid ASC LIMIT ?",
+    "SELECT cid FROM blobs WHERE cid IS NOT NULL AND refs > 0 AND cid > ? ORDER BY cid ASC LIMIT ?",
   );
+  const putBlobStatement = db.prepare(
+    "INSERT OR IGNORE INTO blobs (cid, mime) VALUES (?, ?) RETURNING rowid",
+  );
+  const updateBlobCidStatement = db.prepare("UPDATE blobs SET cid = ? WHERE rowid = ?");
 
   return {
     did,
@@ -82,5 +91,18 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
     listBlobs: (limit, cursor) =>
       listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
+    createBlob: (cid, mime) => putBlobStatement.get<{ rowid: number }>(cid, mime)?.rowid,
+    writeBlob: async (blobId, data: ReadableStream) => {
+      const blob = db.openBlob({ table: "blobs", row: blobId, column: "data" });
+      await data.pipeTo(blob.writable);
+
+      const size = blob.byteLength;
+      const hash = await crypto.subtle.digest("SHA-256", await toArrayBuffer(blob.readable));
+      const cid = cidToString(encodeCidFromDigest(0x55, new Uint8Array(hash)));
+      void updateBlobCidStatement.run(blobId, cid);
+      blob.close();
+
+      return [cid, size];
+    },
   };
 }

@@ -33,7 +33,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       cid TEXT,
       mime TEXT NOT NULL,
       refs INTEGER NOT NULL DEFAULT 0,
-      data BLOB
+      data BLOB NOT NULL
     ) STRICT;
     CREATE INDEX IF NOT EXISTS blob_cid ON blobs (cid);
   `);
@@ -73,7 +73,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     "SELECT cid FROM blobs WHERE cid IS NOT NULL AND refs > 0 AND cid > ? ORDER BY cid ASC LIMIT ?",
   );
   const putBlobStatement = db.prepare(
-    "INSERT OR IGNORE INTO blobs (cid, mime) VALUES (?, ?) RETURNING rowid",
+    "INSERT OR IGNORE INTO blobs (cid, mime, data) VALUES (?, ?, ?) RETURNING rowid",
   );
   const updateBlobCidStatement = db.prepare("UPDATE blobs SET cid = ? WHERE rowid = ?");
 
@@ -91,7 +91,8 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
     listBlobs: (limit, cursor) =>
       listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
-    createBlob: (cid, mime) => putBlobStatement.get<{ rowid: number }>(cid, mime)?.rowid,
+    createBlob: (cid, mime) =>
+      putBlobStatement.get<{ rowid: number }>(cid, mime, new Uint8Array(0))?.rowid,
     writeBlob: async (blobId, data: ReadableStream) => {
       const blob = db.openBlob({
         table: "blobs",

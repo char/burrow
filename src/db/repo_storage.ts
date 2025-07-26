@@ -18,8 +18,8 @@ export interface RepoStorage {
   setCommit: (cid: Cid) => void;
 
   listBlobs: (limit: number, cursor?: string) => Cid[];
-  createBlob: (cid: Cid | null, mime: string) => number | undefined;
-  writeBlob: (id: number, data: ReadableStream) => Promise<[cid: Cid, size: number]>;
+  createBlob: (cid: Cid | null, mime: string, size: number) => number | undefined;
+  writeBlob: (id: number, data: ReadableStream) => Promise<Cid>;
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
@@ -91,8 +91,8 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
     listBlobs: (limit, cursor) =>
       listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
-    createBlob: (cid, mime) =>
-      putBlobStatement.get<{ rowid: number }>(cid, mime, new Uint8Array(0))?.rowid,
+    createBlob: (cid, mime, size) =>
+      putBlobStatement.get<{ rowid: number }>(cid, mime, new Uint8Array(size))?.rowid,
     writeBlob: async (blobId, data: ReadableStream) => {
       const blob = db.openBlob({
         table: "blobs",
@@ -102,13 +102,12 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       });
       await data.pipeTo(blob.writable);
 
-      const size = blob.byteLength;
       const hash = await crypto.subtle.digest("SHA-256", await toArrayBuffer(blob.readable));
       const cid = cidToString(encodeCidFromDigest(0x55, new Uint8Array(hash)));
       void updateBlobCidStatement.run(blobId, cid);
       blob.close();
 
-      return [cid, size];
+      return cid;
     },
   };
 }

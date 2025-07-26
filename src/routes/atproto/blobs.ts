@@ -34,10 +34,13 @@ export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
 
     const body = ctx.request.body.stream;
     if (!body) throw new XRPCError("InvalidRequest", "uploadBlob missing body");
+    const size = ctx.request.headers.get("content-length")?.$pipe(Number);
+    if (!size || !Number.isSafeInteger(size))
+      throw new XRPCError("InvalidRequest", "uploadBlob body indeterminate size");
     const mimeType = ctx.request.headers.get("content-type") ?? "application/octet-stream";
-    const blobId = repo.storage.createBlob(null, mimeType);
+    const blobId = repo.storage.createBlob(null, mimeType, size);
     if (!blobId) throw new Error("unreachable");
-    const [cid, size] = await repo.storage.writeBlob(blobId, body);
+    const cid = await repo.storage.writeBlob(blobId, body);
 
     return { blob: { $type: "blob", mimeType, ref: CidLink.fromCid(cid), size } };
   });

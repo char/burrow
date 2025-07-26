@@ -81,6 +81,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     "INSERT OR IGNORE INTO blobs (cid, mime, data) VALUES (?, ?, ?) RETURNING rowid",
   );
   const updateBlobCidStatement = db.prepare("UPDATE blobs SET cid = ? WHERE rowid = ?");
+  const deleteBlobStatement = db.prepare("DELETE FROM blobs WHERE cid = ?");
 
   const listBlobRefsStatement = db.prepare(
     "SELECT cid FROM blob_refs WHERE collection = ? AND rkey = ?",
@@ -121,9 +122,13 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       await data.pipeTo(blob.writable);
 
       const hash = await crypto.subtle.digest("SHA-256", await toArrayBuffer(blob.readable));
-      const cid = cidToString(encodeCidFromDigest(0x55, new Uint8Array(hash)));
-      void updateBlobCidStatement.run(cid, blobId);
       blob.close();
+
+      const cid = cidToString(encodeCidFromDigest(0x55, new Uint8Array(hash)));
+      db.transaction(() => {
+        void deleteBlobStatement.run(cid);
+        void updateBlobCidStatement.run(cid, blobId);
+      })();
 
       return cid;
     },

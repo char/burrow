@@ -1,11 +1,11 @@
 import { Application } from "@oak/oak";
-import { XRPCError, XRPCRouter } from "../../xrpc-server.ts";
-import { DidSchema } from "../../util/did.ts";
 import { CidLink, j } from "../../_deps.ts";
-import { openRepository } from "../../repo.ts";
-import { mainDb } from "../../db/main_db.ts";
 import { apiAuthenticationInfo } from "../../auth.ts";
+import { mainDb } from "../../db/main_db.ts";
+import { openRepository } from "../../repo.ts";
 import { BlobRef } from "../../util/blob-ref.ts";
+import { DidSchema } from "../../util/did.ts";
+import { XRPCError, XRPCRouter } from "../../xrpc-server.ts";
 
 export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(

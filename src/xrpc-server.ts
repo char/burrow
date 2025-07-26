@@ -3,9 +3,9 @@
 import { Context, Middleware } from "@oak/oak";
 import { URLSearchParams } from "node:url";
 import { j } from "./_deps.ts";
+import { apiAuthenticationInfo } from "./auth.ts";
 import { appConfig } from "./config.ts";
 import { isDid, resolveDid } from "./util/did.ts";
-import { apiAuthenticationInfo } from "./auth.ts";
 
 const xrpcPattern = new URLPattern({ pathname: "/xrpc/:lxm" });
 

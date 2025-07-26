@@ -3,12 +3,11 @@ import { assert, Bytes, CBOR, CidLink, j, TID } from "./_deps.ts";
 import { mainDb } from "./db/main_db.ts";
 import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
+import { atUri, AtUri } from "./util/at-uri.ts";
+import { findBlobRefs } from "./util/blob-ref.ts";
 import { Cid, CidSchema, createCid } from "./util/cid.ts";
 import { Did } from "./util/did.ts";
-import { atUri, AtUri } from "./util/at-uri.ts";
 import { XRPCError } from "./xrpc-server.ts";
-import { checkOpts } from "@noble/hashes/utils";
-import { findBlobRefs } from "./util/blob-ref.ts";
 
 interface CommitNode {
   did: Did;

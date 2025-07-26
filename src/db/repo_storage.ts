@@ -1,9 +1,9 @@
 import { Database } from "@db/sqlite";
+import { toArrayBuffer } from "jsr:@std/streams@1/to-array-buffer";
 import { fs, path } from "../_deps.ts";
 import { appConfig } from "../config.ts";
 import { Cid, cidToString, encodeCidFromDigest } from "../util/cid.ts";
 import { Did } from "../util/did.ts";
-import { toArrayBuffer } from "jsr:@std/streams@1/to-array-buffer";
 
 export interface RepoStorage {
   did: Did;

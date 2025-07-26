@@ -9,14 +9,14 @@ import { apiAuthMiddleware } from "./auth.ts";
 import { appConfig } from "./config.ts";
 import { XRPCRouter } from "./xrpc-server.ts";
 
+import { setupBlobRoutes } from "./routes/atproto/blobs.ts";
+import { setupRepoQueryRoutes } from "./routes/atproto/repo_queries.ts";
+import { setupRepoWriteRoutes } from "./routes/atproto/repo_writes.ts";
+import { setupServerRoutes } from "./routes/atproto/server.ts";
 import { setupCookieAuthRoutes } from "./routes/cookie_auth.ts";
 import { setupDidWebRoutes } from "./routes/did_web.ts";
 import { setupOAuthRoutes } from "./routes/oauth.ts";
 import { setupTestRoutes } from "./routes/test.ts";
-import { setupServerRoutes } from "./routes/atproto/server.ts";
-import { setupRepoQueryRoutes } from "./routes/atproto/repo_queries.ts";
-import { setupRepoWriteRoutes } from "./routes/atproto/repo_writes.ts";
-import { setupBlobRoutes } from "./routes/atproto/blobs.ts";
 
 const app = new Application({ keys: [appConfig.cookieSecret] });
 const xrpc = new XRPCRouter();

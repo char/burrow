@@ -20,6 +20,10 @@ export interface RepoStorage {
   listBlobs: (limit: number, cursor?: string) => Cid[];
   createBlob: (cid: Cid | null, mime: string, size: number) => number | undefined;
   writeBlob: (id: number, data: ReadableStream) => Promise<Cid>;
+
+  listBlobRefs: (collection: string, rkey: string) => Cid[];
+  addBlobRefs: (collection: string, rkey: string, cids: Cid[]) => void;
+  purgeBlobRefs: (collection: string, rkey: string, cids: Cid[]) => void;
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
@@ -39,10 +43,11 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blob_refs (
+      cid TEXT NOT NULL,
       collection TEXT NOT NULL,
-      rkey TEXT NOT NULL,
-      blob_id INTEGER NOT NULL
+      rkey TEXT NOT NULL
     ) STRICT;
+    CREATE UNIQUE INDEX IF NOT EXISTS blob_ref_record ON blob_refs (cid, collection, rkey);
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS blocks (
@@ -77,6 +82,19 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   );
   const updateBlobCidStatement = db.prepare("UPDATE blobs SET cid = ? WHERE rowid = ?");
 
+  const listBlobRefsStatement = db.prepare(
+    "SELECT cid FROM blob_refs WHERE collection = ? AND rkey = ?",
+  );
+  const addBlobRefStatement = db.prepare(
+    "INSERT OR IGNORE INTO blob_refs (cid, collection, rkey) VALUES (?, ?, ?)",
+  );
+  const purgeBlobRefStatement = db.prepare(
+    "DELETE FROM blob_refs WHERE collection = ? AND rkey = ? AND cid = ?",
+  );
+  const recomputeRefsStatement = db.prepare(
+    "UPDATE blobs SET refs = (SELECT count(*) FROM blob_refs WHERE blob_refs.cid = ?1) WHERE blobs.cid = ?1",
+  );
+
   return {
     did,
     db,
@@ -108,6 +126,22 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       blob.close();
 
       return cid;
+    },
+
+    listBlobRefs: (collection, rkey) =>
+      listBlobRefsStatement.all<{ cid: Cid }>(collection, rkey).map(it => it.cid),
+    addBlobRefs: (collection, rkey, cids) =>
+      db.transaction(() =>
+        cids.forEach(cid => {
+          addBlobRefStatement.run(collection, rkey, cid);
+          recomputeRefsStatement.run(cid);
+        }),
+      )(),
+    purgeBlobRefs: (collection, rkey, cids) => {
+      for (const cid of cids) {
+        purgeBlobRefStatement.run(collection, rkey, cid);
+        recomputeRefsStatement.run(cid);
+      }
     },
   };
 }

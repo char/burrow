@@ -8,6 +8,7 @@ import { Did } from "./util/did.ts";
 import { atUri, AtUri } from "./util/at-uri.ts";
 import { XRPCError } from "./xrpc-server.ts";
 import { checkOpts } from "@noble/hashes/utils";
+import { findBlobRefs } from "./util/blob-ref.ts";
 
 interface CommitNode {
   did: Did;
@@ -151,6 +152,13 @@ export class Repository {
           if (existingCid)
             throw new XRPCError("InvalidSwap", `Record was at ${existingCid}`, { uri });
 
+          const refs = findBlobRefs(w.value as object);
+          this.storage.addBlobRefs(
+            w.collection,
+            rkey,
+            refs.map(it => it.ref.$link as Cid),
+          );
+
           const cid = this.#storeRecord(w.value);
           map.set(`${w.collection}/${rkey}`, cid);
           spawned.push(cid);
@@ -168,11 +176,24 @@ export class Repository {
           if (
             (w.swapRecord !== undefined && (existingCid ?? null) !== w.swapRecord) ||
             (w.swapRecord === undefined && existingCid === undefined)
-          )
+          ) {
             throw new XRPCError("InvalidSwap", `Record was at ${existingCid ?? "null"}`, {
               uri,
             });
-          if (existingCid) purged.push(existingCid);
+          }
+
+          if (existingCid) {
+            purged.push(existingCid);
+
+            const record = this.getRecord(w.collection, w.rkey);
+            if (record) {
+              this.storage.purgeBlobRefs(
+                w.collection,
+                w.rkey,
+                findBlobRefs(record).map(it => it.ref.$link as Cid),
+              );
+            }
+          }
 
           const cid = this.#storeRecord(w.value);
           map.set(`${w.collection}/${w.rkey}`, cid);
@@ -190,6 +211,15 @@ export class Repository {
           const cid = map.get(`${w.collection}/${w.rkey}`);
           if (!cid || (w.swapRecord && cid !== w.swapRecord))
             throw new XRPCError("InvalidSwap", `Record was at ${cid ?? "null"}`, { uri });
+
+          const record = this.getRecord(w.collection, w.rkey);
+          if (record) {
+            this.storage.purgeBlobRefs(
+              w.collection,
+              w.rkey,
+              findBlobRefs(record).map(it => it.ref.$link as Cid),
+            );
+          }
 
           map.delete(`${w.collection}/${w.rkey}`);
           purged.push(cid);

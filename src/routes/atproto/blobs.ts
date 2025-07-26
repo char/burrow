@@ -5,6 +5,7 @@ import { CidLink, j } from "../../_deps.ts";
 import { openRepository } from "../../repo.ts";
 import { mainDb } from "../../db/main_db.ts";
 import { apiAuthenticationInfo } from "../../auth.ts";
+import { BlobRef } from "../../util/blob-ref.ts";
 
 export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -42,6 +43,8 @@ export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
     if (!blobId) throw new Error("unreachable");
     const cid = await repo.storage.writeBlob(blobId, body);
 
-    return { blob: { $type: "blob", mimeType, ref: CidLink.fromCid(cid), size } };
+    return {
+      blob: { $type: "blob", mimeType, ref: CidLink.fromCid(cid), size } satisfies BlobRef,
+    };
   });
 }

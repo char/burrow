@@ -23,6 +23,11 @@ const router = new Router();
 app.use(async (ctx, next) => {
   ctx.response.headers.set("access-control-allow-origin", "*");
   ctx.response.headers.set("access-control-allow-methods", "*");
+  if (ctx.request.headers.has("access-control-request-headers"))
+    ctx.response.headers.set(
+      "access-control-allow-headers",
+      ctx.request.headers.get("access-control-request-headers")!,
+    );
 
   try {
     return await next();

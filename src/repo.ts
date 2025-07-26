@@ -239,10 +239,6 @@ export class Repository {
     this.#lastCommitCid = commitCid;
     this.#lastCidMap = map;
 
-    // gc pruned blocks
-    this.storage.deleteBlock(lastCommitCid);
-    for (const cid of purged) this.storage.deleteBlock(cid);
-
     // TODO: emit commit on event stream using spawnlist as blocks ?
 
     return {

@@ -38,7 +38,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
       input: {
         repo: j.string,
         collection: j.string,
-        rkey: j.string,
+        rkey: j.optional(j.string),
         validate: j.optional(j.boolean),
         record: j.unknown,
         swapCommit: j.optional(CidSchema),
@@ -63,13 +63,10 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
 
       const repo = await openRepository(did);
-      const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
       const results = await repo.write(
         [
           {
-            $type: currentCid
-              ? "com.atproto.repo.applyWrites#update"
-              : "com.atproto.repo.applyWrites#create",
+            $type: "com.atproto.repo.applyWrites#create",
             rkey: opts.input.rkey,
             collection: opts.input.collection,
             value: opts.input.record,

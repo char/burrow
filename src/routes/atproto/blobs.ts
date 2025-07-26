@@ -84,6 +84,7 @@ export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
       // TODO: ETag? If-Modified-Since?
 
       ctx.response.type = blob.mime;
+      ctx.response.headers.set("content-disposition", "inline");
 
       if (rangeRes.ranges) {
         ctx.response.status = Status.PartialContent;

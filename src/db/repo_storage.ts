@@ -93,7 +93,12 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
     createBlob: (cid, mime) => putBlobStatement.get<{ rowid: number }>(cid, mime)?.rowid,
     writeBlob: async (blobId, data: ReadableStream) => {
-      const blob = db.openBlob({ table: "blobs", row: blobId, column: "data" });
+      const blob = db.openBlob({
+        table: "blobs",
+        row: blobId,
+        column: "data",
+        readonly: false,
+      });
       await data.pipeTo(blob.writable);
 
       const size = blob.byteLength;

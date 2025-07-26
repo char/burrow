@@ -106,11 +106,10 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
       }
 
       const car = concat(parts);
+
       ctx.response.type = "application/vnd.ipld.car";
       ctx.response.status = 200;
       ctx.response.body = car;
-
-      return undefined;
     },
   );
 }

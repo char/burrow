@@ -1,12 +1,13 @@
 import { Application } from "@oak/oak";
-import { j } from "../_deps.ts";
-import { openRepository } from "../repo.ts";
+import { j, TID } from "../_deps.ts";
+import { openRepository, RepoMutation } from "../repo.ts";
 import { CidSchema } from "../util/cid.ts";
 import { DidSchema, resolveDid } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
 import { apiAuthenticationInfo } from "../auth.ts";
 import { mainDb } from "../db/main_db.ts";
 import { atUri } from "../util/at-uri.ts";
+import { resolveHandle } from "../util/handle-resolution.ts";
 
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -35,7 +36,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
     {
       method: "com.atproto.repo.putRecord",
       input: {
-        repo: DidSchema,
+        repo: j.string,
         collection: j.string,
         rkey: j.string,
         validate: j.optional(j.boolean),
@@ -58,7 +59,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
     async (ctx, opts) => {
       const auth = apiAuthenticationInfo.get(ctx.request);
       if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
-      const did = opts.input.repo;
+      const did = await resolveHandle(opts.input.repo);
       if (auth.did !== did)
         throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
 
@@ -155,6 +156,105 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
 
       const repo = await openRepository(account.did);
       return { cursor: "", records: repo.listRecords(opts.params.collection) };
+    },
+  );
+
+  xrpc.procedure(
+    {
+      method: "com.atproto.repo.applyWrites",
+      input: {
+        repo: j.string,
+        validate: j.optional(j.boolean),
+        swapCommit: j.optional(CidSchema),
+        writes: j.array(
+          j.discriminatedUnion("$type", [
+            j.obj({
+              $type: j.literal("com.atproto.repo.applyWrites#create"),
+              collection: j.string,
+              rkey: j.optional(j.string),
+              value: j.unknown,
+            }),
+            j.obj({
+              $type: j.literal("com.atproto.repo.applyWrites#update"),
+              collection: j.string,
+              rkey: j.string,
+              value: j.unknown,
+            }),
+            j.obj({
+              $type: j.literal("com.atproto.repo.applyWrites#delete"),
+              collection: j.string,
+              rkey: j.string,
+            }),
+          ]),
+        ),
+      },
+    },
+    async (ctx, opts) => {
+      const auth = apiAuthenticationInfo.get(ctx.request);
+      if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
+      const did = await resolveHandle(opts.input.repo);
+      if (auth.did !== did)
+        throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
+
+      const repo = await openRepository(did);
+
+      const currentCommit = repo.getCurrCommit()?.data?.toCid();
+      if (opts.input.swapCommit && currentCommit !== opts.input.swapCommit)
+        throw new XRPCError("InvalidSwap", `Commit was at ${currentCommit ?? "null"}`);
+
+      const mutations: RepoMutation[] = opts.input.writes.map(it => {
+        switch (it.$type) {
+          case "com.atproto.repo.applyWrites#create": {
+            return {
+              type: "create",
+              collection: it.collection,
+              rkey: it.rkey ?? TID.now(),
+              record: it.value,
+            };
+          }
+          case "com.atproto.repo.applyWrites#update": {
+            return {
+              type: "update",
+              collection: it.collection,
+              rkey: it.rkey,
+              record: it.value,
+            };
+          }
+          case "com.atproto.repo.applyWrites#delete": {
+            return { type: "delete", collection: it.collection, rkey: it.rkey };
+          }
+          default:
+            throw new Error("unreachable: unknown applyWrites write type");
+        }
+      });
+
+      await repo.mutate(mutations);
+
+      const commit = { cid: repo.storage.getCommit()!, rev: repo.getCurrCommit()!.rev };
+
+      const results = mutations.map(it => {
+        switch (it.type) {
+          case "create": {
+            return {
+              $type: "com.atproto.repo.applyWrites#createResult",
+              uri: atUri`${repo.storage.did}/${it.collection}/${it.rkey}`,
+              cid: repo.getRecordCid(it.collection, it.rkey)!,
+            };
+          }
+          case "update": {
+            return {
+              $type: "com.atproto.repo.applyWrites#updateResult",
+              uri: atUri`${repo.storage.did}/${it.collection}/${it.rkey}`,
+              cid: repo.getRecordCid(it.collection, it.rkey)!,
+            };
+          }
+          case "delete": {
+            return { $type: "com.atproto.repo.applyWrites#deleteResult" };
+          }
+        }
+      });
+
+      return { commit, results };
     },
   );
 }

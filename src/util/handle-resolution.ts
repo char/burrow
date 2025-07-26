@@ -4,6 +4,8 @@ import { Did, isDid } from "./did.ts";
 const handleCache = new Map<string, { did: Did; expiresAt: number }>();
 
 export async function resolveHandle(handle: string): Promise<Did | undefined> {
+  if (isDid(handle)) return handle;
+
   const cached = handleCache.get(handle);
   if (cached && Date.now() <= cached.expiresAt) return cached.did;
 

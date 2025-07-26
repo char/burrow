@@ -35,7 +35,14 @@ export function setupTestRoutes(_app: Application, router: Router) {
       hello: "world",
     };
     const rkey = TID.now();
-    await repo.mutate([{ type: "create", collection: record.$type, rkey, record }]);
+    await repo.write([
+      {
+        $type: "com.atproto.repo.applyWrites#create",
+        collection: record.$type,
+        rkey,
+        value: record,
+      },
+    ]);
 
     ctx.response.body = ":)";
   });

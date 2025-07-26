@@ -1,6 +1,6 @@
 import { Application } from "@oak/oak";
-import { j, TID } from "../_deps.ts";
-import { openRepository, RepoMutation } from "../repo.ts";
+import { assert, j } from "../_deps.ts";
+import { openRepository } from "../repo.ts";
 import { CidSchema } from "../util/cid.ts";
 import { DidSchema, resolveDid } from "../util/did.ts";
 import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
@@ -29,6 +29,64 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
         throw new XRPCError("RecordNotFound", "Could not locate record: " + uri);
       }
       return { uri, cid, value: record };
+    },
+  );
+
+  xrpc.procedure(
+    {
+      method: "com.atproto.repo.createRecord",
+      input: {
+        repo: j.string,
+        collection: j.string,
+        rkey: j.string,
+        validate: j.optional(j.boolean),
+        record: j.unknown,
+        swapCommit: j.optional(CidSchema),
+      },
+      output: {
+        uri: j.string,
+        cid: CidSchema,
+        commit: j.union(
+          j.literal(null),
+          j.obj({
+            cid: CidSchema,
+            rev: j.string,
+          }),
+        ),
+      },
+    },
+    async (ctx, opts) => {
+      const auth = apiAuthenticationInfo.get(ctx.request);
+      if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
+      const did = await resolveHandle(opts.input.repo);
+      if (auth.did !== did)
+        throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
+
+      const repo = await openRepository(did);
+      const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
+      const results = await repo.write(
+        [
+          {
+            $type: currentCid
+              ? "com.atproto.repo.applyWrites#update"
+              : "com.atproto.repo.applyWrites#create",
+            rkey: opts.input.rkey,
+            collection: opts.input.collection,
+            value: opts.input.record,
+          },
+        ],
+        opts.input.swapCommit,
+      );
+
+      const firstResult = results.results[0];
+      assert(firstResult.$type !== "com.atproto.repo.applyWrites#deleteResult");
+
+      return {
+        uri: firstResult.uri,
+        cid: firstResult.cid,
+        commit: results.commit,
+        validationStatus: "valid",
+      };
     },
   );
 
@@ -75,22 +133,24 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
       if (opts.input.swapRecord !== undefined && currentCid !== swapRecord)
         throw new XRPCError("InvalidSwap", `Record was at ${currentCid ?? "null"}`);
 
-      await repo.mutate([
+      const results = await repo.write([
         {
-          type: currentCid ? "update" : "create",
+          $type: currentCid
+            ? "com.atproto.repo.applyWrites#update"
+            : "com.atproto.repo.applyWrites#create",
           rkey: opts.input.rkey,
           collection: opts.input.collection,
-          record: opts.input.record,
+          value: opts.input.record,
         },
       ]);
 
-      const uri = atUri`${repo.storage.did}/${opts.input.collection}/${opts.input.rkey}`;
-      const cid = repo.getRecordCid(opts.input.collection, opts.input.rkey)!;
-      const commit = repo.getCurrCommit()!;
+      const firstResult = results.results[0];
+      assert(firstResult.$type !== "com.atproto.repo.applyWrites#deleteResult");
+
       return {
-        uri,
-        cid,
-        commit: { cid: commit.data.toCid(), rev: commit.rev },
+        uri: firstResult.uri,
+        cid: firstResult.cid,
+        commit: results.commit,
         validationStatus: "valid",
       };
     },
@@ -202,59 +262,7 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
       if (opts.input.swapCommit && currentCommit !== opts.input.swapCommit)
         throw new XRPCError("InvalidSwap", `Commit was at ${currentCommit ?? "null"}`);
 
-      const mutations: RepoMutation[] = opts.input.writes.map(it => {
-        switch (it.$type) {
-          case "com.atproto.repo.applyWrites#create": {
-            return {
-              type: "create",
-              collection: it.collection,
-              rkey: it.rkey ?? TID.now(),
-              record: it.value,
-            };
-          }
-          case "com.atproto.repo.applyWrites#update": {
-            return {
-              type: "update",
-              collection: it.collection,
-              rkey: it.rkey,
-              record: it.value,
-            };
-          }
-          case "com.atproto.repo.applyWrites#delete": {
-            return { type: "delete", collection: it.collection, rkey: it.rkey };
-          }
-          default:
-            throw new Error("unreachable: unknown applyWrites write type");
-        }
-      });
-
-      await repo.mutate(mutations);
-
-      const commit = { cid: repo.storage.getCommit()!, rev: repo.getCurrCommit()!.rev };
-
-      const results = mutations.map(it => {
-        switch (it.type) {
-          case "create": {
-            return {
-              $type: "com.atproto.repo.applyWrites#createResult",
-              uri: atUri`${repo.storage.did}/${it.collection}/${it.rkey}`,
-              cid: repo.getRecordCid(it.collection, it.rkey)!,
-            };
-          }
-          case "update": {
-            return {
-              $type: "com.atproto.repo.applyWrites#updateResult",
-              uri: atUri`${repo.storage.did}/${it.collection}/${it.rkey}`,
-              cid: repo.getRecordCid(it.collection, it.rkey)!,
-            };
-          }
-          case "delete": {
-            return { $type: "com.atproto.repo.applyWrites#deleteResult" };
-          }
-        }
-      });
-
-      return { commit, results };
+      return await repo.write(opts.input.writes);
     },
   );
 }

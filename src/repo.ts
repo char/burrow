@@ -1,11 +1,12 @@
 import { P256PrivateKey, Secp256k1PrivateKey } from "@atcute/crypto";
-import { assert, Bytes, CBOR, CidLink, TID } from "./_deps.ts";
+import { assert, Bytes, CBOR, CidLink, j, TID } from "./_deps.ts";
 import { mainDb } from "./db/main_db.ts";
 import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
 import { Cid, createCid } from "./util/cid.ts";
 import { Did } from "./util/did.ts";
 import { atUri, AtUri } from "./util/at-uri.ts";
+import { XRPCError } from "./xrpc-server.ts";
 
 interface CommitNode {
   did: Did;
@@ -19,10 +20,38 @@ interface SignedCommitNode extends CommitNode {
   sig: Bytes;
 }
 
-export type RepoMutation =
-  | { type: "create"; collection: string; rkey: string; record: unknown }
-  | { type: "update"; collection: string; rkey: string; record: unknown }
-  | { type: "delete"; collection: string; rkey: string };
+export const RepoWriteSchema = j.discriminatedUnion("$type", [
+  j.obj({
+    $type: j.literal("com.atproto.repo.applyWrites#create"),
+    collection: j.string,
+    rkey: j.optional(j.string),
+    value: j.unknown,
+  }),
+  j.obj({
+    $type: j.literal("com.atproto.repo.applyWrites#update"),
+    collection: j.string,
+    rkey: j.string,
+    value: j.unknown,
+  }),
+  j.obj({
+    $type: j.literal("com.atproto.repo.applyWrites#delete"),
+    collection: j.string,
+    rkey: j.string,
+  }),
+]);
+export type RepoWrite = j.Infer<typeof RepoWriteSchema>;
+export type RepoWriteResults = {
+  repoEffects: { spawned: Cid[]; purged: Cid[] };
+  commit: { cid: Cid; rev: string };
+  results: (
+    | {
+        $type: `com.atproto.repo.applyWrites#${"createResult" | "updateResult"}`;
+        uri: AtUri;
+        cid: Cid;
+      }
+    | { $type: `com.atproto.repo.applyWrites#deleteResult` }
+  )[];
+};
 
 export type RepoSigningKey = P256PrivateKey | Secp256k1PrivateKey;
 
@@ -63,7 +92,10 @@ export class Repository {
     return cid;
   }
 
-  async #writeCommit(newRoot: CidLink, lastCommit?: CommitNode): Promise<Cid> {
+  async #writeCommit(
+    newRoot: CidLink,
+    lastCommit?: CommitNode,
+  ): Promise<[Cid, SignedCommitNode]> {
     const commit: CommitNode = {
       version: 3,
       did: this.storage.did,
@@ -81,7 +113,7 @@ export class Repository {
     const cid = createCid(0x71, data);
     this.storage.putBlock(cid, data, 2);
     this.storage.setCommit(cid);
-    return cid;
+    return [cid, signedCommit];
   }
 
   async initialCommit() {
@@ -90,41 +122,70 @@ export class Repository {
     const _commit = await this.#writeCommit(root);
   }
 
-  async mutate(mutations: RepoMutation[]) {
+  async write(writes: RepoWrite[], swapCommit?: Cid): Promise<RepoWriteResults> {
     const lastCommitCid = this.storage.getCommit();
     if (!lastCommitCid) throw new Error("tried to mutate repo that had no initial commit");
+
+    if (swapCommit && lastCommitCid !== swapCommit)
+      throw new XRPCError("InvalidSwap", `Commit was at ${lastCommitCid ?? "null"}`);
 
     const lastCommit = this.storage
       .getBlock(lastCommitCid)
       ?.$pipe(CBOR.decode) as SignedCommitNode;
 
+    const results: RepoWriteResults["results"] = [];
     const spawned: Cid[] = [];
-    const pruned: Cid[] = [];
+    const purged: Cid[] = [];
 
     const map = this.#readCidMap();
-    for (const m of mutations) {
-      switch (m.type) {
-        case "create": {
-          const cid = this.#storeRecord(m.record);
-          map.set(`${m.collection}/${m.rkey}`, cid);
-          spawned.push(cid);
-          break;
-        }
-        case "update": {
-          const existingCid = map.get(`${m.collection}/${m.rkey}`);
-          if (existingCid) pruned.push(existingCid);
+    for (const w of writes) {
+      switch (w.$type) {
+        case "com.atproto.repo.applyWrites#create": {
+          const rkey = w.rkey ?? TID.now();
+          const uri = atUri`${this.storage.did}/${w.collection}/${rkey}`;
 
-          const cid = this.#storeRecord(m.record);
-          map.set(`${m.collection}/${m.rkey}`, cid);
+          const existingCid = map.get(`${w.collection}/${rkey}`);
+          if (existingCid)
+            throw new XRPCError("InvalidSwap", `Record was at ${existingCid}`, { uri });
+
+          const cid = this.#storeRecord(w.value);
+          map.set(`${w.collection}/${rkey}`, cid);
           spawned.push(cid);
+          results.push({
+            $type: "com.atproto.repo.applyWrites#createResult",
+            uri,
+            cid,
+          });
           break;
         }
-        case "delete": {
-          const cid = map.get(`${m.collection}/${m.rkey}`);
-          if (cid) {
-            map.delete(`${m.collection}/${m.rkey}`);
-            pruned.push(cid);
-          }
+        case "com.atproto.repo.applyWrites#update": {
+          const uri = atUri`${this.storage.did}/${w.collection}/${w.rkey}`;
+
+          const existingCid = map.get(`${w.collection}/${w.rkey}`);
+          if (!existingCid) throw new XRPCError("InvalidSwap", `Record was at null`, { uri });
+          purged.push(existingCid);
+
+          const cid = this.#storeRecord(w.value);
+          map.set(`${w.collection}/${w.rkey}`, cid);
+          spawned.push(cid);
+          results.push({
+            $type: "com.atproto.repo.applyWrites#updateResult",
+            uri,
+            cid,
+          });
+          break;
+        }
+        case "com.atproto.repo.applyWrites#delete": {
+          const uri = atUri`${this.storage.did}/${w.collection}/${w.rkey}`;
+
+          const cid = map.get(`${w.collection}/${w.rkey}`);
+          if (!cid) throw new XRPCError("InvalidSwap", `Record was at null`, { uri });
+
+          map.delete(`${w.collection}/${w.rkey}`);
+          purged.push(cid);
+          results.push({
+            $type: "com.atproto.repo.applyWrites#deleteResult",
+          });
           break;
         }
       }
@@ -132,7 +193,7 @@ export class Repository {
 
     this.storage.clearEphemeralBlocks();
     const root = generateMST(this.storage, map, spawned);
-    const commitCid = await this.#writeCommit(root, lastCommit);
+    const [commitCid, commit] = await this.#writeCommit(root, lastCommit);
     spawned.push(commitCid);
 
     this.#lastCommitCid = commitCid;
@@ -140,9 +201,15 @@ export class Repository {
 
     // gc pruned blocks
     this.storage.deleteBlock(lastCommitCid);
-    for (const cid of pruned) this.storage.deleteBlock(cid);
+    for (const cid of purged) this.storage.deleteBlock(cid);
 
-    // TODO: emit commit on event stream using spawnlist as blocks
+    // TODO: emit commit on event stream using spawnlist as blocks ?
+
+    return {
+      commit: { cid: commitCid, rev: commit.rev },
+      repoEffects: { spawned, purged },
+      results,
+    };
   }
 
   getRecordCid(collection: string, rkey: string): Cid | undefined {

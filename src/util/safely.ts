@@ -11,7 +11,7 @@ function result_unwrap<T>(this: Result<T>, mapError?: (orig: Error) => Error): T
 
 function createResult<T>(data: ResultData<T>): Result<T> {
   const result = [...data] as Result<T>;
-  Reflect.defineProperty(result, "unwrapOrThrow", {
+  Reflect.defineProperty(result, "unwrap", {
     value: result_unwrap,
     enumerable: false,
   });

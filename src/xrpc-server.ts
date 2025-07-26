@@ -96,7 +96,7 @@ type InferSpecType<T extends Record<string, j.AnySchema> | undefined> = undefine
 interface QuerySpecIn {
   method: string;
   params?: Record<string, j.AnySchema>;
-  output?: Record<string, j.AnySchema>;
+  output?: typeof NOT_JSON_OUTPUT | Record<string, j.AnySchema>;
 }
 
 interface ProcedureSpecIn {

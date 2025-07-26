@@ -1,10 +1,13 @@
 import { Application } from "@oak/oak";
-import { XRPCRouter } from "../xrpc-server.ts";
-import { j } from "../_deps.ts";
+import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
+import { CBOR, CidLink, j, varint } from "../_deps.ts";
 import { DidSchema } from "../util/did.ts";
 import { CidSchema } from "../util/cid.ts";
 import { openRepository } from "../repo.ts";
 import { mainDb } from "../db/main_db.ts";
+import { findKey } from "../mst.ts";
+import { toCidLink } from "@atcute/cbor";
+import { concat } from "@atcute/uint8array";
 
 export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
@@ -52,6 +55,61 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
         });
       }
       return { cursor: "", repos };
+    },
+  );
+
+  xrpc.query(
+    {
+      method: "com.atproto.sync.getRecord",
+      params: {
+        did: DidSchema,
+        collection: j.string,
+        rkey: j.string,
+      },
+    },
+    async (ctx, opts) => {
+      const account = mainDb.getAccount(opts.params.did);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
+      const repo = await openRepository(account.did);
+      const root = repo.storage.getCommit();
+      if (!root)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
+
+      const blocks = findKey(
+        repo.storage,
+        root,
+        opts.params.collection + "/" + opts.params.rkey,
+      );
+
+      const recordCid = repo.getRecordCid(opts.params.collection, opts.params.rkey);
+      if (!recordCid) throw new XRPCError("RecordNotFound", `Could not find record`);
+      const recordBlock = recordCid?.$pipe(repo.storage.getBlock);
+      if (!recordCid || !recordBlock)
+        throw new XRPCError("RecordNotFound", `Could not find record`);
+      blocks.push([recordCid, recordBlock]);
+
+      const parts: Uint8Array[] = [];
+
+      const header = CBOR.encode({ version: 1, roots: [root] });
+      const headerLen = new Uint8Array(10).$pipe(b =>
+        b.subarray(0, varint.encode(header.byteLength, b)),
+      );
+      parts.push(headerLen, header);
+      for (const [cid, data] of blocks) {
+        const cidBytes = CidLink.fromCid(cid).bytes;
+        const blockLen = new Uint8Array(10).$pipe(b =>
+          b.subarray(0, varint.encode(cidBytes.byteLength + data.byteLength, b)),
+        );
+        parts.push(blockLen, cidBytes, data);
+      }
+
+      const car = concat(parts);
+      ctx.response.type = "application/vnd.ipld.car";
+      ctx.response.status = 200;
+      ctx.response.body = car;
+
+      return undefined;
     },
   );
 }

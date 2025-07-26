@@ -1,4 +1,4 @@
-import { decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
+import { concat, decodeUtf8From, encodeUtf8 } from "@atcute/uint8array";
 import { createHash } from "node:crypto";
 import { assert, Bytes, CBOR, CidLink } from "./_deps.ts";
 import { RepoStorage } from "./db/repo_storage.ts";
@@ -188,4 +188,45 @@ export function collectMSTKeys(repo: RepoStorage, cid: Cid, map: Map<string, Cid
     map.set(key, entry.v.toCid());
     if (entry.t) collectMSTKeys(repo, entry.t.toCid(), map);
   }
+}
+
+export function findKey(
+  repo: RepoStorage,
+  rootCid: Cid,
+  targetKey: string,
+): [Cid, Uint8Array][] {
+  const block = repo.getBlock(rootCid);
+  const node: MSTNode | undefined = block?.$pipe(CBOR.decode);
+  if (!block || !node) return [];
+
+  let index: number | undefined;
+  let foundKey: string | undefined;
+  {
+    let key = "";
+    for (let i = 0; i <= node.e.length; i++) {
+      const entry = node.e[i];
+      const prefix = key.substring(0, entry.p);
+      key = prefix + decodeUtf8From(CBOR.fromBytes(entry.k));
+      if (key >= targetKey) {
+        index = i;
+        foundKey = key;
+        break;
+      }
+    }
+    if (!index) index = node.e.length;
+  }
+
+  const stack: [Cid, Uint8Array][] = [];
+  const entry = node.e.at(index);
+  if (entry && foundKey === targetKey) {
+    // stack = []
+  } else {
+    const prev = node.e.at(index - 1);
+    if (!prev || prev.t === null) return [];
+    else stack.push(...findKey(repo, prev.t.toCid(), targetKey));
+  }
+
+  stack.push([rootCid, block] as const);
+
+  return stack;
 }

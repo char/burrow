@@ -12,6 +12,7 @@
     "@atcute/multibase": "npm:@atcute/multibase@^1.1.4",
     "@atcute/tid": "npm:@atcute/tid@^1.0.2",
     "@atcute/uint8array": "npm:@atcute/uint8array@^1.0.3",
+    "@atcute/varint": "npm:@atcute/varint@^1.0.2",
     "@char/justin": "jsr:@char/justin@^0.3.5",
     "@db/sqlite": "jsr:@db/sqlite@^0.12.0",
     "@noble/hashes": "jsr:@noble/hashes@^1.8.0",

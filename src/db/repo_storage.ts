@@ -104,7 +104,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
       const hash = await crypto.subtle.digest("SHA-256", await toArrayBuffer(blob.readable));
       const cid = cidToString(encodeCidFromDigest(0x55, new Uint8Array(hash)));
-      void updateBlobCidStatement.run(blobId, cid);
+      void updateBlobCidStatement.run(cid, blobId);
       blob.close();
 
       return cid;

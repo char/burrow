@@ -194,7 +194,7 @@ export function collectMSTKeys(repo: RepoStorage, cid: Cid, map: Map<string, Cid
   }
 }
 
-export function findKey(
+export function traverseMSTForKey(
   repo: RepoStorage,
   rootCid: Cid,
   targetKey: string,
@@ -204,7 +204,7 @@ export function findKey(
   if (!block || !node) return [];
 
   if (node.l) {
-    const left = findKey(repo, node.l.toCid(), targetKey);
+    const left = traverseMSTForKey(repo, node.l.toCid(), targetKey);
     if (left.length) {
       left.push([rootCid, block]);
       return left;
@@ -235,7 +235,7 @@ export function findKey(
   } else {
     const prev = node.e.at(index - 1);
     if (!prev || prev.t === null) return [];
-    else stack.push(...findKey(repo, prev.t.toCid(), targetKey));
+    else stack.push(...traverseMSTForKey(repo, prev.t.toCid(), targetKey));
   }
 
   stack.push([rootCid, block]);

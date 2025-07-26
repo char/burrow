@@ -7,14 +7,16 @@ import { Application, Router } from "@oak/oak";
 
 import { apiAuthMiddleware } from "./auth.ts";
 import { appConfig } from "./config.ts";
-import { setupRepoRoutes } from "./routes/atproto_repo.ts";
+import { XRPCRouter } from "./xrpc-server.ts";
+
 import { setupCookieAuthRoutes } from "./routes/cookie_auth.ts";
 import { setupDidWebRoutes } from "./routes/did_web.ts";
 import { setupOAuthRoutes } from "./routes/oauth.ts";
 import { setupTestRoutes } from "./routes/test.ts";
-import { XRPCRouter } from "./xrpc-server.ts";
-import { setupServerRoutes } from "./routes/atproto_server.ts";
-import { setupSyncRoutes } from "./routes/atproto_sync.ts";
+import { setupServerRoutes } from "./routes/atproto/server.ts";
+import { setupRepoQueryRoutes } from "./routes/atproto/repo_queries.ts";
+import { setupRepoWriteRoutes } from "./routes/atproto/repo_writes.ts";
+import { setupBlobRoutes } from "./routes/atproto/blobs.ts";
 
 const app = new Application({ keys: [appConfig.cookieSecret] });
 const xrpc = new XRPCRouter();
@@ -69,8 +71,9 @@ setupOAuthRoutes(app, router);
 setupTestRoutes(app, router);
 setupDidWebRoutes(app, router);
 setupServerRoutes(app, xrpc);
-setupRepoRoutes(app, xrpc);
-setupSyncRoutes(app, xrpc);
+setupRepoQueryRoutes(app, xrpc);
+setupRepoWriteRoutes(app, xrpc);
+setupBlobRoutes(app, xrpc);
 
 app.use(xrpc.middleware());
 app.use(router.routes());

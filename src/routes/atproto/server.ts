@@ -1,9 +1,9 @@
-import { Application } from "@oak/oak";
-import { j } from "../_deps.ts";
-import { appConfig } from "../config.ts";
-import { DidSchema } from "../util/did.ts";
-import { urlSchema } from "../util/schemas.ts";
-import { XRPCRouter } from "../xrpc-server.ts";
+import { Application } from "@oak/oak/application";
+import { j } from "../../_deps.ts";
+import { appConfig } from "../../config.ts";
+import { DidSchema } from "../../util/did.ts";
+import { urlSchema } from "../../util/schemas.ts";
+import { XRPCRouter } from "../../xrpc-server.ts";
 
 export function setupServerRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(

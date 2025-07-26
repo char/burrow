@@ -15,6 +15,8 @@ export interface RepoStorage {
 
   getCommit: () => Cid | undefined;
   setCommit: (cid: Cid) => void;
+
+  listBlobs: (limit: number, cursor?: string) => Cid[];
 }
 
 export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
@@ -62,6 +64,10 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     "INSERT OR REPLACE INTO block_aliases (name, cid) VALUES ('commit', ?)",
   );
 
+  const listBlobsStatement = db.prepare(
+    "SELECT cid FROM blobs WHERE refs > 0 AND cid > ? ORDER BY cid ASC LIMIT ?",
+  );
+
   return {
     did,
     db,
@@ -73,5 +79,8 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
 
     getCommit: () => getCommitStatement.get<{ cid: string }>()?.cid as Cid | undefined,
     setCommit: cid => void setCommitStatement.run(cid),
+
+    listBlobs: (limit, cursor) =>
+      listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
   };
 }

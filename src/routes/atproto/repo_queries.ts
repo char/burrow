@@ -1,14 +1,100 @@
 import { Application } from "@oak/oak";
-import { XRPCError, XRPCRouter } from "../xrpc-server.ts";
-import { CBOR, CidLink, j, varint } from "../_deps.ts";
-import { DidSchema } from "../util/did.ts";
-import { CidSchema } from "../util/cid.ts";
-import { openRepository } from "../repo.ts";
-import { mainDb } from "../db/main_db.ts";
-import { findKey } from "../mst.ts";
+import { XRPCError, XRPCRouter } from "../../xrpc-server.ts";
+import { openRepository } from "../../repo.ts";
+import { atUri } from "../../util/at-uri.ts";
+import { CidSchema } from "../../util/cid.ts";
+import { CBOR, CidLink, j, varint } from "../../_deps.ts";
+import { DidSchema, resolveDid } from "../../util/did.ts";
+import { mainDb } from "../../db/main_db.ts";
 import { concat } from "@atcute/uint8array";
+import { traverseMSTForKey } from "../../mst.ts";
 
-export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
+export function setupRepoQueryRoutes(_app: Application, xrpc: XRPCRouter) {
+  xrpc.query(
+    {
+      method: "com.atproto.repo.describeRepo",
+      params: { repo: DidSchema },
+      output: {
+        handle: j.string,
+        did: DidSchema,
+        didDoc: j.unknown,
+        collections: j.array(j.string),
+        handleIsCorrect: j.boolean,
+      },
+    },
+    async (_ctx, opts) => {
+      const account = mainDb.getAccount(opts.params.repo);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+
+      const repo = await openRepository(account.did);
+      const collections = repo.listCollections();
+      const didDoc = await resolveDid(account.did);
+
+      return {
+        handle: account.handle,
+        did: account.did,
+        didDoc,
+        handleIsCorrect: true,
+        collections,
+      };
+    },
+  );
+
+  xrpc.query(
+    {
+      method: "com.atproto.repo.getRecord",
+      params: {
+        repo: DidSchema,
+        collection: j.string,
+        rkey: j.string,
+        cid: j.optional(CidSchema),
+      },
+    },
+    async (_ctx, { params: { repo: did, collection, rkey, cid: requestedCid } }) => {
+      const repo = await openRepository(did);
+      const record = repo.getRecord(collection, rkey);
+      const uri = atUri`${did}/${collection}/${rkey}`;
+      const cid = repo.getRecordCid(collection, rkey);
+      if (!record || (requestedCid && requestedCid !== cid)) {
+        throw new XRPCError("RecordNotFound", "Could not locate record: " + uri);
+      }
+      return { uri, cid, value: record };
+    },
+  );
+
+  xrpc.query(
+    {
+      method: "com.atproto.repo.listRecords",
+      params: {
+        repo: DidSchema,
+        collection: j.string,
+        limit: j.optional(j.number),
+        cursor: j.optional(j.string),
+        reverse: j.optional(j.boolean),
+      },
+      output: {
+        cursor: j.optional(j.string),
+        records: j.array(
+          j.obj({
+            uri: j.string,
+            cid: CidSchema,
+            value: j.unknown,
+          }),
+        ),
+      },
+    },
+    async (_ctx, opts) => {
+      // TODO: pagination
+      const account = mainDb.getAccount(opts.params.repo);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+
+      const repo = await openRepository(account.did);
+      return { records: repo.listRecords(opts.params.collection) };
+    },
+  );
+
   xrpc.query(
     {
       method: "com.atproto.sync.listRepos",
@@ -17,7 +103,7 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
         cursor: j.optional(j.string),
       },
       output: {
-        cursor: j.string,
+        cursor: j.optional(j.string),
         repos: j.array(
           j.obj({
             did: DidSchema,
@@ -53,7 +139,7 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
           active: account.deactivated_at === null,
         });
       }
-      return { cursor: "", repos };
+      return { repos };
     },
   );
 
@@ -76,7 +162,7 @@ export function setupSyncRoutes(_app: Application, xrpc: XRPCRouter) {
       if (!rootCid || !root)
         throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
 
-      const blocks = findKey(
+      const blocks = traverseMSTForKey(
         repo.storage,
         root.data.toCid(),
         opts.params.collection + "/" + opts.params.rkey,

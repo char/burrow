@@ -1,4 +1,4 @@
-import { Application, Router } from "@oak/oak";
+import { Application } from "@oak/oak";
 import { XRPCError, XRPCRouter } from "../../xrpc-server.ts";
 import { DidSchema } from "../../util/did.ts";
 import { CidLink, j } from "../../_deps.ts";
@@ -6,7 +6,7 @@ import { openRepository } from "../../repo.ts";
 import { mainDb } from "../../db/main_db.ts";
 import { apiAuthenticationInfo } from "../../auth.ts";
 
-export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter, router: Router) {
+export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
     {
       method: "com.atproto.sync.listBlobs",
@@ -27,7 +27,7 @@ export function setupBlobRoutes(_app: Application, xrpc: XRPCRouter, router: Rou
     },
   );
 
-  router.post("/xrpc/com.atproto.repo.uploadBlob", async ctx => {
+  xrpc.procedure({ method: "com.atproto.repo.uploadBlob" }, async ctx => {
     const auth = apiAuthenticationInfo.get(ctx.request);
     if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
     const repo = await openRepository(auth.did);

@@ -73,7 +73,7 @@ setupDidWebRoutes(app, router);
 setupServerRoutes(app, xrpc);
 setupRepoQueryRoutes(app, xrpc);
 setupRepoWriteRoutes(app, xrpc);
-setupBlobRoutes(app, xrpc, router);
+setupBlobRoutes(app, xrpc);
 
 app.use(xrpc.middleware());
 app.use(router.routes());

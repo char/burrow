@@ -17,6 +17,7 @@ export interface RepoStorage {
   getCommit: () => Cid | undefined;
   setCommit: (cid: Cid) => void;
 
+  getBlob: (cid: Cid) => { rowid: number; mime: string } | undefined;
   listBlobs: (limit: number, cursor?: string) => Cid[];
   createBlob: (cid: Cid | null, mime: string, size: number) => number | undefined;
   writeBlob: (id: number, data: ReadableStream) => Promise<Cid>;
@@ -82,6 +83,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
   );
   const updateBlobCidStatement = db.prepare("UPDATE blobs SET cid = ? WHERE rowid = ?");
   const deleteBlobStatement = db.prepare("DELETE FROM blobs WHERE cid = ?");
+  const getBlobIdStatement = db.prepare("SELECT rowid, mime FROM blobs WHERE cid = ?");
 
   const listBlobRefsStatement = db.prepare(
     "SELECT cid FROM blob_refs WHERE collection = ? AND rkey = ?",
@@ -108,6 +110,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     getCommit: () => getCommitStatement.get<{ cid: string }>()?.cid as Cid | undefined,
     setCommit: cid => void setCommitStatement.run(cid),
 
+    getBlob: cid => getBlobIdStatement.get<{ rowid: number; mime: string }>(cid),
     listBlobs: (limit, cursor) =>
       listBlobsStatement.all<{ cid: Cid }>(cursor ?? "", limit).map(it => it.cid),
     createBlob: (cid, mime, size) =>

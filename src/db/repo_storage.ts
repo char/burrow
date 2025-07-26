@@ -128,6 +128,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
       db.transaction(() => {
         void deleteBlobStatement.run(cid);
         void updateBlobCidStatement.run(cid, blobId);
+        void recomputeRefsStatement.run(cid);
       })();
 
       return cid;

@@ -12,6 +12,37 @@ import { resolveHandle } from "../util/handle-resolution.ts";
 export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
   xrpc.query(
     {
+      method: "com.atproto.repo.describeRepo",
+      params: { repo: DidSchema },
+      output: {
+        handle: j.string,
+        did: DidSchema,
+        didDoc: j.unknown,
+        collections: j.array(j.string),
+        handleIsCorrect: j.boolean,
+      },
+    },
+    async (_ctx, opts) => {
+      const account = mainDb.getAccount(opts.params.repo);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+
+      const repo = await openRepository(account.did);
+      const collections = repo.listCollections();
+      const didDoc = await resolveDid(account.did);
+
+      return {
+        handle: account.handle,
+        did: account.did,
+        didDoc,
+        handleIsCorrect: true,
+        collections,
+      };
+    },
+  );
+
+  xrpc.query(
+    {
       method: "com.atproto.repo.getRecord",
       params: {
         repo: DidSchema,
@@ -120,26 +151,21 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
 
       const repo = await openRepository(did);
 
-      const currentCommit = repo.getCurrCommit()?.data?.toCid();
-      if (opts.input.swapCommit && currentCommit !== opts.input.swapCommit)
-        throw new XRPCError("InvalidSwap", `Commit was at ${currentCommit ?? "null"}`);
-
       const currentCid = repo.getRecordCid(opts.input.collection, opts.input.rkey);
-      // undefined implies we don't want to check, null implies we want to ensure it didn't exist before
-      const swapRecord = opts.input.swapRecord ?? undefined;
-      if (opts.input.swapRecord !== undefined && currentCid !== swapRecord)
-        throw new XRPCError("InvalidSwap", `Record was at ${currentCid ?? "null"}`);
-
-      const results = await repo.write([
-        {
-          $type: currentCid
-            ? "com.atproto.repo.applyWrites#update"
-            : "com.atproto.repo.applyWrites#create",
-          rkey: opts.input.rkey,
-          collection: opts.input.collection,
-          value: opts.input.record,
-        },
-      ]);
+      const results = await repo.write(
+        [
+          {
+            $type: currentCid
+              ? "com.atproto.repo.applyWrites#update"
+              : "com.atproto.repo.applyWrites#create",
+            rkey: opts.input.rkey,
+            collection: opts.input.collection,
+            value: opts.input.record,
+            swapRecord: opts.input.swapRecord,
+          },
+        ],
+        opts.input.swapCommit,
+      );
 
       const firstResult = results.results[0];
       assert(firstResult.$type !== "com.atproto.repo.applyWrites#deleteResult");
@@ -153,34 +179,39 @@ export function setupRepoRoutes(_app: Application, xrpc: XRPCRouter) {
     },
   );
 
-  xrpc.query(
+  xrpc.procedure(
     {
-      method: "com.atproto.repo.describeRepo",
-      params: { repo: DidSchema },
-      output: {
-        handle: j.string,
-        did: DidSchema,
-        didDoc: j.unknown,
-        collections: j.array(j.string),
-        handleIsCorrect: j.boolean,
+      method: "com.atproto.repo.deleteRecord",
+      input: {
+        repo: j.string,
+        collection: j.string,
+        rkey: j.string,
+        swapRecord: j.optional(CidSchema),
+        swapCommit: j.optional(CidSchema),
       },
     },
-    async (_ctx, opts) => {
-      const account = mainDb.getAccount(opts.params.repo);
-      if (!account)
-        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.repo}`);
+    async (ctx, opts) => {
+      const auth = apiAuthenticationInfo.get(ctx.request);
+      if (!auth) throw new XRPCError("AuthMissing", "Authentication required");
+      const did = await resolveHandle(opts.input.repo);
+      if (auth.did !== did)
+        throw new XRPCError("AuthMissing", "Authentication does not match requested repo");
 
-      const repo = await openRepository(account.did);
-      const collections = repo.listCollections();
-      const didDoc = await resolveDid(account.did);
+      const repo = await openRepository(did);
 
-      return {
-        handle: account.handle,
-        did: account.did,
-        didDoc,
-        handleIsCorrect: true,
-        collections,
-      };
+      const results = await repo.write(
+        [
+          {
+            $type: "com.atproto.repo.applyWrites#delete",
+            collection: opts.input.collection,
+            rkey: opts.input.rkey,
+            swapRecord: opts.input.swapRecord,
+          },
+        ],
+        opts.input.swapCommit,
+      );
+
+      return { commit: results.commit };
     },
   );
 

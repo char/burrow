@@ -3,10 +3,11 @@ import { assert, Bytes, CBOR, CidLink, j, TID } from "./_deps.ts";
 import { mainDb } from "./db/main_db.ts";
 import { openRepoDatabase, RepoStorage } from "./db/repo_storage.ts";
 import { collectMSTKeys, generateMST } from "./mst.ts";
-import { Cid, createCid } from "./util/cid.ts";
+import { Cid, CidSchema, createCid } from "./util/cid.ts";
 import { Did } from "./util/did.ts";
 import { atUri, AtUri } from "./util/at-uri.ts";
 import { XRPCError } from "./xrpc-server.ts";
+import { checkOpts } from "@noble/hashes/utils";
 
 interface CommitNode {
   did: Did;
@@ -32,11 +33,13 @@ export const RepoWriteSchema = j.discriminatedUnion("$type", [
     collection: j.string,
     rkey: j.string,
     value: j.unknown,
+    swapRecord: j.optional(j.union(j.literal(null), CidSchema)),
   }),
   j.obj({
     $type: j.literal("com.atproto.repo.applyWrites#delete"),
     collection: j.string,
     rkey: j.string,
+    swapRecord: j.optional(CidSchema),
   }),
 ]);
 export type RepoWrite = j.Infer<typeof RepoWriteSchema>;
@@ -162,8 +165,14 @@ export class Repository {
           const uri = atUri`${this.storage.did}/${w.collection}/${w.rkey}`;
 
           const existingCid = map.get(`${w.collection}/${w.rkey}`);
-          if (!existingCid) throw new XRPCError("InvalidSwap", `Record was at null`, { uri });
-          purged.push(existingCid);
+          if (
+            (!existingCid && w.swapRecord === undefined) ||
+            (existingCid ?? null) !== w.swapRecord
+          )
+            throw new XRPCError("InvalidSwap", `Record was at ${existingCid ?? "null"}`, {
+              uri,
+            });
+          if (existingCid) purged.push(existingCid);
 
           const cid = this.#storeRecord(w.value);
           map.set(`${w.collection}/${w.rkey}`, cid);
@@ -179,7 +188,8 @@ export class Repository {
           const uri = atUri`${this.storage.did}/${w.collection}/${w.rkey}`;
 
           const cid = map.get(`${w.collection}/${w.rkey}`);
-          if (!cid) throw new XRPCError("InvalidSwap", `Record was at null`, { uri });
+          if (!cid || (w.swapRecord && cid !== w.swapRecord))
+            throw new XRPCError("InvalidSwap", `Record was at ${cid ?? "null"}`, { uri });
 
           map.delete(`${w.collection}/${w.rkey}`);
           purged.push(cid);

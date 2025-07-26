@@ -169,7 +169,7 @@ const lookupLocalDid = db.prepare("SELECT did FROM accounts WHERE handle = ?").$
 
 const insertOAuthCode = db
   .prepare(
-    `INSERT OR IGNORE INTO oauth_codes
+    `INSERT OR REPLACE INTO oauth_codes
     (code, request, request_uri)
     VALUES (?, ?, ?)`,
   )

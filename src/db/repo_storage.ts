@@ -86,7 +86,7 @@ export async function openRepoDatabase(did: Did): Promise<RepoStorage> {
     "SELECT cid FROM blob_refs WHERE collection = ? AND rkey = ?",
   );
   const addBlobRefStatement = db.prepare(
-    "INSERT OR IGNORE INTO blob_refs (cid, collection, rkey) VALUES (?, ?, ?)",
+    "INSERT OR IGNORE INTO blob_refs (collection, rkey, cid) VALUES (?, ?, ?)",
   );
   const purgeBlobRefStatement = db.prepare(
     "DELETE FROM blob_refs WHERE collection = ? AND rkey = ? AND cid = ?",

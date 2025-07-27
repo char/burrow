@@ -23,7 +23,6 @@ const dpopAuthJwtPayload = j
   .$pipe(j.compile);
 
 export const apiAuthenticationInfo = new WeakMap<Request, AuthInfo>();
-
 export const apiAuthMiddleware: Middleware = async (ctx, next) => {
   const authorizationHeader = ctx.request.headers.get("authorization");
   if (!authorizationHeader) return next();
@@ -65,4 +64,11 @@ export const apiAuthMiddleware: Middleware = async (ctx, next) => {
   }
 
   return next();
+};
+
+export const cookieAuthInfo = new WeakMap<Request, Did>();
+export const cookieAuthMiddleware: Middleware = async (ctx, next) => {
+  const burrowAuth = await ctx.cookies.get("burrow-auth", { signed: true });
+  if (burrowAuth) cookieAuthInfo.set(ctx.request, burrowAuth as Did);
+  return await next();
 };

@@ -1,26 +1,8 @@
 import "./util/idiolect.ts";
 
-import denoJson from "../deno.json" with { type: "json" };
-const VERSION = denoJson.version;
-
-import { Application, Router } from "@oak/oak";
-
 import { apiAuthMiddleware } from "./auth.ts";
 import { appConfig } from "./config.ts";
-import { XRPCRouter } from "./xrpc-server.ts";
-
-import { setupBlobRoutes } from "./routes/atproto/blobs.ts";
-import { setupRepoQueryRoutes } from "./routes/atproto/repo_queries.ts";
-import { setupRepoWriteRoutes } from "./routes/atproto/repo_writes.ts";
-import { setupServerRoutes } from "./routes/atproto/server.ts";
-import { setupCookieAuthRoutes } from "./routes/cookie_auth.ts";
-import { setupDidWebRoutes } from "./routes/did_web.ts";
-import { setupOAuthRoutes } from "./routes/oauth.ts";
-import { setupTestRoutes } from "./routes/test.ts";
-
-const app = new Application({ keys: [appConfig.cookieSecret] });
-const xrpc = new XRPCRouter();
-const router = new Router();
+import { app, router, xrpc } from "./web.ts";
 
 app.use(async (ctx, next) => {
   ctx.response.headers.set("access-control-allow-origin", "*");
@@ -36,44 +18,15 @@ app.use(async (ctx, next) => {
   } catch (err) {
     console.error(err);
     ctx.response.status = 500;
-    ctx.response.body = "Internal Server Error";
+    ctx.response.body = "internal server error :(";
     ctx.response.type = "text/plain";
   }
-});
-
-xrpc.query({ method: "_health" }, () => ({ version: "burrow " + VERSION }));
-
-router.get("/", ctx => {
-  ctx.response.type = "text/plain; charset=utf-8";
-  ctx.response.body = `burrow pds version ${VERSION}
-
- /)/)
-( . .)
-( づ♡
-
-this is an atproto PDS ^-^ see atproto.com`;
 });
 
 app.use(apiAuthMiddleware);
+app.use(apiAuthMiddleware);
 
-router.get("/static/:file*", async ctx => {
-  try {
-    await ctx.send({ root: "./static", path: ctx.params.file });
-  } catch {
-    ctx.response.status = 404;
-    ctx.response.type = "text/plain";
-    ctx.response.body = "Not Found";
-  }
-});
-
-setupCookieAuthRoutes(app, router);
-setupOAuthRoutes(app, router);
-setupTestRoutes(app, router);
-setupDidWebRoutes(app, router);
-setupServerRoutes(app, xrpc);
-setupRepoQueryRoutes(app, xrpc);
-setupRepoWriteRoutes(app, xrpc);
-setupBlobRoutes(app, xrpc);
+import "./routes/mod.ts";
 
 app.use(xrpc.middleware());
 app.use(router.routes());
@@ -85,5 +38,7 @@ app.use(ctx => {
   ctx.response.status = 404;
 });
 
-console.log(`Listening on: http://${appConfig.bindHost}:${appConfig.port}`);
-app.listen({ port: appConfig.port, hostname: appConfig.bindHost });
+if (import.meta.main) {
+  console.log(`Listening on: http://${appConfig.bindHost}:${appConfig.port}`);
+  app.listen({ port: appConfig.port, hostname: appConfig.bindHost });
+}

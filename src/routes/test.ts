@@ -1,14 +1,12 @@
 import { Secp256k1PrivateKeyExportable } from "@atcute/crypto";
-import { Application, Router } from "@oak/oak";
 import { TID } from "../_deps.ts";
 import { appConfig } from "../config.ts";
 import { mainDb } from "../db/main_db.ts";
 import { openRepoDatabase } from "../db/repo_storage.ts";
 import { Repository } from "../repo.ts";
+import { router } from "../web.ts";
 
-export function setupTestRoutes(_app: Application, router: Router) {
-  if (!appConfig.adminPassword) return;
-
+if (appConfig.adminPassword) {
   router.post("/test/create-account", async ctx => {
     if (ctx.request.headers.get("Authorization") !== `Bearer ${appConfig.adminPassword}`) {
       ctx.response.body = "Unauthorized";

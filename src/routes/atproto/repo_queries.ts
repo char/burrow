@@ -198,4 +198,19 @@ export function setupRepoQueryRoutes(_app: Application, xrpc: XRPCRouter) {
       ctx.response.body = car;
     },
   );
+
+  xrpc.query(
+    { method: "com.atproto.sync.getRepoStatus", params: { did: DidSchema } },
+    async (_ctx, opts) => {
+      const account = mainDb.getAccount(opts.params.did);
+      if (!account)
+        throw new XRPCError("RepoNotFound", `Could not find repo for DID: ${opts.params.did}`);
+      const repo = await openRepository(account.did);
+      return {
+        did: account.did,
+        active: account.deactivated_at === undefined,
+        rev: repo.getCurrCommit()?.rev,
+      };
+    },
+  );
 }
